@@ -1,0 +1,71 @@
+/* Screen styles - hide by default or show as preview */
+.print-container {
+    display: none;
+    /* Hidden on screen by default */
+    background: white;
+    color: black;
+    font-family: 'Sarabun', 'Inter', sans-serif;
+}
+
+/* Print Styles */
+@media print {
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    body * {
+        visibility: hidden;
+    }
+
+    .print-container,
+    .print-container * {
+        visibility: visible;
+    }
+
+    .print-container {
+        display: block !important;
+        position: absolute;
+        left: 1cm;
+        top: 1cm;
+        width: auto;
+        height: auto;
+        padding: 0;
+        background: transparent;
+        z-index: 9999;
+    }
+
+    .mini-slip {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .qr-box {
+        margin-bottom: 4px;
+        text-align: center;
+    }
+
+    .qr-explain {
+        font-size: 9pt;
+        color: black;
+        margin-top: 2px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .info-box {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .rx-no,
+    .rx-date {
+        font-size: 10pt;
+        white-space: nowrap;
+        color: black;
+        line-height: 1.2;
+    }
+}

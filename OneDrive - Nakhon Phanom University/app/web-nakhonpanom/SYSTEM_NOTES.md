@@ -105,6 +105,7 @@ systemctl restart pocketbase
 4. ✅ เปลี่ยน **Default Status** เมื่อเพิ่มงานใหม่จาก "รอดำเนินการ" เป็น "กำลังดำเนินการ"
 5. ✅ ย้าย **Calendar Icon** ไปอยู่ขวาสุดของ input วันที่
 6. ✅ ลบ **Calendar Icon** ออกจาก ThaiDatePicker ตามคำขอ
+7. ✅ **Push Git:** `v1.0 - Production Release` → https://github.com/bravo0000/web-nakhonpanom
 
 ---
 

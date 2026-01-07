@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 import ThaiDatePicker from './ThaiDatePicker';
+import pb from '../lib/pocketbase';
 import './AddJobModal.css';
 
 const DEPTS = [
@@ -17,17 +18,26 @@ const PREFIXES = {
     'ฝ่ายอำนวยการ': 'A'
 };
 
-export default function AddJobModal({ isOpen, onClose, onSubmit, editJob = null, deptSettings, jobTypes = {}, jobs = [] }) {
+export default function AddJobModal({ isOpen, onClose, onSubmit, editJob = null, deptSettings, jobTypes = {}, jobs = [], currentUser }) {
     if (!isOpen) return null;
+
+    // Filter departments based on user role
+    const allowedDepartments = DEPTS.filter(dept => {
+        if (!currentUser) return false;
+        if (currentUser.role === 'admin') return true;
+        return currentUser.departments && currentUser.departments.includes(dept);
+    });
 
     const [formData, setFormData] = useState({
         receptionNo: '',
         date: new Date().toISOString().split('T')[0],
-        department: 'ฝ่ายรังวัด',
+        department: allowedDepartments.length > 0 ? allowedDepartments[0] : (DEPTS[0] || ''),
         type: '',
         owner: '',
-        assignees: []
+        assignees: [] // Will store IDs
     });
+
+
 
     // Generate Next Reception Number Logic
     const generateNextReceptionNo = useCallback((dept) => {
@@ -60,11 +70,13 @@ export default function AddJobModal({ isOpen, onClose, onSubmit, editJob = null,
                 ...editJob,
                 department: editJob.department || 'ฝ่ายรังวัด',
                 type: editJob.type || '',
+                // If editing, we expect editJob.assignees to be IDs (from AdminDashboard prep)
+                // If it's old data (names), this might break UI check, but we are fixing AdminDash to pass IDs.
                 assignees: editJob.assignees || []
             });
         } else {
             // Reset for new job with AUTO-GENERATED number
-            const defaultDept = 'ฝ่ายรังวัด';
+            const defaultDept = allowedDepartments.length > 0 ? allowedDepartments[0] : (DEPTS[0] || 'ฝ่ายรังวัด');
             setFormData({
                 receptionNo: generateNextReceptionNo(defaultDept),
                 date: new Date().toISOString().split('T')[0],
@@ -91,13 +103,13 @@ export default function AddJobModal({ isOpen, onClose, onSubmit, editJob = null,
         }));
     };
 
-    const handleCheckboxChange = (officerName) => {
+    const handleCheckboxChange = (officerId) => {
         setFormData(prev => {
-            const isSelected = prev.assignees?.includes(officerName);
+            const isSelected = prev.assignees?.includes(officerId);
             if (isSelected) {
-                return { ...prev, assignees: prev.assignees.filter(a => a !== officerName) };
+                return { ...prev, assignees: prev.assignees.filter(a => a !== officerId) };
             } else {
-                return { ...prev, assignees: [...(prev.assignees || []), officerName] };
+                return { ...prev, assignees: [...(prev.assignees || []), officerId] };
             }
         });
     };
@@ -148,7 +160,7 @@ export default function AddJobModal({ isOpen, onClose, onSubmit, editJob = null,
                                     disabled={!!editJob} // Disable dept change during edit to prevent workflow mismatch
                                     style={{ opacity: editJob ? 0.7 : 1 }}
                                 >
-                                    {DEPTS.map(d => (
+                                    {allowedDepartments.map(d => (
                                         <option key={d} value={d}>{d}</option>
                                     ))}
                                 </select>
@@ -213,17 +225,20 @@ export default function AddJobModal({ isOpen, onClose, onSubmit, editJob = null,
                                 <div className="checkbox-group">
                                     {currentOfficers.length === 0 ? (
                                         <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem' }}>
-                                            ไม่พบรายชื่อเจ้าหน้าที่ (กรุณาเพิ่มในหน้าตั้งค่า)
+                                            ไม่พบรายชื่อในหน้า "ตั้งค่า" (กรุณาเพิ่มในเมนูตั้งค่าก่อน)
                                         </div>
                                     ) : (
-                                        currentOfficers.map((officer) => (
-                                            <label key={officer.id || officer.name} className="checkbox-item">
+                                        currentOfficers.map((officer, idx) => (
+                                            <label key={`${officer.name}-${idx}`} className="checkbox-item">
                                                 <input
                                                     type="checkbox"
                                                     checked={formData.assignees?.includes(officer.name)}
                                                     onChange={() => handleCheckboxChange(officer.name)}
                                                 />
-                                                <span className="checkbox-label">{officer.name}</span>
+                                                <span className="checkbox-label">
+                                                    {officer.name}
+                                                    {officer.phone && <span style={{ color: '#666', fontSize: '0.85rem', marginLeft: 6 }}>({officer.phone})</span>}
+                                                </span>
                                             </label>
                                         ))
                                     )}

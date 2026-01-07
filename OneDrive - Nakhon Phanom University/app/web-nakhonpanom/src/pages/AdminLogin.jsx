@@ -8,17 +8,25 @@ export default function AdminLogin() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
+        setIsLoading(true);
 
-        const result = login(username, password);
-        if (result.success) {
-            navigate('/admin/dashboard');
-        } else {
-            setError(result.message);
+        try {
+            const result = await login(username, password);
+            if (result.success) {
+                navigate('/admin/dashboard');
+            } else {
+                setError(result.message);
+            }
+        } catch (err) {
+            setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -32,7 +40,7 @@ export default function AdminLogin() {
 
             <div className="login-card">
                 <div className="login-logo">
-                    <span>L</span>
+                    <img src="/dol_logo.png" alt="DOL Logo" />
                 </div>
                 <h1 className="login-title">เจ้าหน้าที่</h1>
                 <p className="login-subtitle">ลงชื่อเข้าใช้เพื่อจัดการระบบ</p>
@@ -49,7 +57,7 @@ export default function AdminLogin() {
                             <User className="input-icon" />
                             <input
                                 type="text"
-                                placeholder="ชื่อผู้ใช้งาน"
+                                placeholder="ชื่อผู้ใช้งาน/อีเมล"
                                 className="form-input"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -72,8 +80,13 @@ export default function AdminLogin() {
                         </div>
                     </div>
 
-                    <button type="submit" className="login-button">
-                        เข้าสู่ระบบ
+                    <button
+                        type="submit"
+                        className="login-button"
+                        disabled={isLoading}
+                        style={{ opacity: isLoading ? 0.7 : 1, cursor: isLoading ? 'wait' : 'pointer' }}
+                    >
+                        {isLoading ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
                     </button>
                 </form>
 

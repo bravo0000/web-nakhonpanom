@@ -10,10 +10,10 @@ export default function Layout({ children }) {
                 <div className="container navbar-container">
                     <Link to="/" className="logo-section">
                         {/* Logo Icon */}
-                        <div className="logo-icon">
-                            <span>L</span>
+                        <div className="logo-icon-img">
+                            <img src="/dol_logo.png" alt="DOL Logo" />
                         </div>
-                        <span className="logo-text">Land Tracking</span>
+                        <span className="logo-text">Lands Tracking</span>
                     </Link>
 
                     <div className="nav-links">

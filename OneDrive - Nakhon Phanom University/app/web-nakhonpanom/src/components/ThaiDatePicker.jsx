@@ -115,7 +115,6 @@ export default function ThaiDatePicker({ value, onChange, placeholder = "เล�
     return (
         <div className="thai-date-picker" ref={containerRef}>
             <div className="input-display" onClick={() => setIsOpen(!isOpen)}>
-                <CalendarIcon className="input-icon" size={18} />
                 <input
                     type="text"
                     readOnly

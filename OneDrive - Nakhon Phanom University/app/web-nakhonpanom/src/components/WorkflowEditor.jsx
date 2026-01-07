@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, ArrowUp, ArrowDown, Shield, Clock, FileText, Users, User, LayoutDashboard } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, ArrowUp, ArrowDown, Shield, Clock, FileText, Users, User, LayoutDashboard, CloudUpload } from 'lucide-react';
 import './WorkflowEditor.css';
 
 const DEPARTMENTS = ['ฝ่ายทะเบียน', 'ฝ่ายรังวัด', 'กลุ่มงานวิชาการที่ดิน', 'ฝ่ายอำนวยการ'];
@@ -11,9 +11,10 @@ export default function WorkflowEditor({
     onUpdateWorkflows,
     jobTypes,
     onUpdateJobTypes,
-    currentUser
+    currentUser,
+    departments = DEPARTMENTS // Default fallback
 }) {
-    const [activeDept, setActiveDept] = useState(DEPARTMENTS[0]);
+    const [activeDept, setActiveDept] = useState(departments[0] || DEPARTMENTS[0]);
     const [newStepName, setNewStepName] = useState('');
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState('');
@@ -153,16 +154,17 @@ export default function WorkflowEditor({
 
     return (
         <div className="workflow-container animate-fade-in-up">
-            <header className="dashboard-header">
+            <header className="dashboard-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1 className="page-title">ตั้งค่าข้อมูลระบบ</h1>
                     <p style={{ color: '#64748b', marginTop: 8 }}>จัดการขั้นตอนการทำงาน ข้อมูลเจ้าหน้าที่ และประเภทงาน</p>
                 </div>
+
             </header>
 
             {/* API Tabs */}
             <div className="filter-bar" style={{ marginBottom: 32, padding: 8, gap: 8, background: '#f1f5f9', border: 'none' }}>
-                {DEPARTMENTS.map(dept => (
+                {departments.map(dept => (
                     <button
                         key={dept}
                         className={`filter-select ${activeDept === dept ? 'active' : ''}`}

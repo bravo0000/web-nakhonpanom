@@ -10,7 +10,7 @@
 
 .input-display .input-icon {
     position: absolute;
-    left: 12px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
     color: #9ca3af;
@@ -19,7 +19,7 @@
 
 .date-input {
     width: 100%;
-    padding: 10px 12px 10px 40px;
+    padding: 10px 40px 10px 12px;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     font-family: inherit;

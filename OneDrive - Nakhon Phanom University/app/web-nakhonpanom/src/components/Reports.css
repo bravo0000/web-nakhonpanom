@@ -1,0 +1,334 @@
+.reports-container {
+    padding: 24px;
+    background-color: #f8fafc;
+    min-height: 100vh;
+}
+
+.reports-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+}
+
+.report-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.filter-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.dept-select {
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    color: #334155;
+    font-weight: 500;
+    background: transparent;
+    cursor: pointer;
+}
+
+.date-input {
+    border: none;
+    outline: none;
+    font-size: 0.9rem;
+    color: #334155;
+    font-weight: 500;
+    background: transparent;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.stat-card-report {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bg-blue-100 {
+    background-color: #eff6ff;
+}
+
+.text-blue-600 {
+    color: #2563eb;
+}
+
+.bg-orange-100 {
+    background-color: #fff7ed;
+}
+
+.text-orange-600 {
+    color: #ea580c;
+}
+
+.bg-red-100 {
+    background-color: #fef2f2;
+}
+
+.text-red-600 {
+    color: #dc2626;
+}
+
+.bg-green-100 {
+    background-color: #f0fdf4;
+}
+
+.text-green-600 {
+    color: #16a34a;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.data-table-section {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 24px;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.95rem;
+}
+
+.report-table th {
+    background-color: #f8fafc;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.print-only {
+    display: none;
+}
+
+.primary-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.primary-button:hover {
+    background: #1d4ed8;
+}
+
+/* Print Styles */
+@media print {
+    @page {
+        size: A4;
+        margin: 1.5cm;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: white;
+        font-family: 'Sarabun', 'TH SarabunPSK', sans-serif;
+    }
+
+    /* Reset containers */
+    body,
+    #root,
+    .admin-container,
+    .admin-content {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        overflow: visible !important;
+    }
+
+    /* Hide UI Chrome */
+    .sidebar,
+    .navbar,
+    .dashboard-header,
+    .no-print,
+    .logout-section,
+    .screen-only,
+    .stat-grid {
+        display: none !important;
+    }
+
+    .reports-container {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: white !important;
+        min-height: auto !important;
+    }
+
+    .reports-container * {
+        visibility: visible !important;
+        opacity: 1 !important;
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+
+    .print-only {
+        display: block !important;
+        text-align: center;
+        margin-bottom: 24px;
+    }
+
+    .print-header h1 {
+        font-size: 20pt;
+        font-weight: bold;
+        margin: 0 0 8px 0;
+        color: #1a365d;
+    }
+
+    .print-header .print-date {
+        font-size: 12pt;
+        color: #333;
+        margin: 0;
+    }
+
+    .data-table-section {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+        border-radius: 0;
+    }
+
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #333;
+    }
+
+    .report-table th,
+    .report-table td {
+        border: 1px solid #333;
+        padding: 10px 12px;
+        font-size: 11pt;
+    }
+
+    .report-table th {
+        background-color: #e8f4f8 !important;
+        color: black !important;
+        font-weight: bold;
+        text-transform: none;
+        letter-spacing: normal;
+    }
+
+    .report-table td {
+        color: black !important;
+        background: white !important;
+    }
+
+    .print-col-no {
+        width: 60px;
+    }
+
+    .summary-row {
+        background-color: #f0f0f0 !important;
+    }
+
+    .summary-row td {
+        background-color: #f0f0f0 !important;
+        border-top: 2px solid #333 !important;
+        font-weight: bold;
+    }
+
+    /* Color overrides for print */
+    .text-green-600,
+    .text-green-700 {
+        color: #16a34a !important;
+    }
+
+    .text-red-600 {
+        color: #dc2626 !important;
+    }
+
+    .text-orange-600 {
+        color: #d97706 !important;
+    }
+}

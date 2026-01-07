@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, LogOut, Plus, Search, Edit, Edit2, Trash2, Users, Clock, Check, Printer } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, LogOut, Plus, Search, Edit, Edit2, Trash2, Users, Clock, Check, Printer, X, ScanBarcode, BarChart2, Archive } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Link, useNavigate } from 'react-router-dom';
-import { getCurrentUser, logout } from '../utils/auth';
+import { getCurrentUser, logout, fetchAppSetting, saveAppSetting } from '../utils/auth';
 import AddJobModal from '../components/AddJobModal';
 import UpdateStatusModal from '../components/UpdateStatusModal';
 import WorkflowEditor from '../components/WorkflowEditor';
 import { AppointmentSlip } from '../components/AppointmentSlip';
 import UserManagement from '../components/UserManagement';
+import Reports from '../components/Reports';
+import SmartDataManager from '../components/SmartDataManager';
+import pb from '../lib/pocketbase';
 import './AdminDashboard.css';
 
 // Mock Data
@@ -116,13 +119,55 @@ const INITIAL_DEPT_SETTINGS = {
 export default function AdminDashboard() {
     const navigate = useNavigate();
 
-    const [currentUser, setCurrentUser] = useState(null);
+    const [currentUser, setCurrentUser] = useState(getCurrentUser());
+
+    useEffect(() => {
+        if (!currentUser) {
+            navigate('/admin');
+        }
+    }, [currentUser, navigate]);
+
+    const handleLogout = () => {
+        logout();
+        navigate('/admin');
+    };
     const [activeTab, setActiveTab] = useState('overview');
+    const [scanInput, setScanInput] = useState('');
+
+    const handleScanSubmit = (e) => {
+        e.preventDefault();
+        const input = scanInput.trim();
+        if (!input) return;
+
+        // Extract Reception No if it's a URL
+        let query = input;
+        try {
+            const url = new URL(input);
+            const recParam = url.searchParams.get('receptionNo');
+            if (recParam) query = recParam;
+        } catch (err) {
+            // Not a URL, use as is
+        }
+
+        // Find Job: Case-insensitive check
+        const job = jobs.find(j => j.receptionNo.toLowerCase() === query.toLowerCase());
+
+        if (job) {
+            setScanInput(''); // Clear input
+            openStatusUpdate(job); // Open Status Update Modal
+        } else {
+            alert(`ไม่พบรายการงานเลขที่: ${query}`);
+            setScanInput('');
+        }
+    };
 
     // Filter States
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDept, setFilterDept] = useState('ทั้งหมด');
-    const [filterStatus, setFilterStatus] = useState('ทั้งหมด');
+    const [filterStatus, setFilterStatus] = useState('active');
+    const [filterAssignee, setFilterAssignee] = useState('ทั้งหมด');
+    const [filterStartDate, setFilterStartDate] = useState('');
+    const [filterEndDate, setFilterEndDate] = useState('');
     const [filterOverviewDept, setFilterOverviewDept] = useState('ทั้งหมด');
 
     // Print State
@@ -130,145 +175,219 @@ export default function AdminDashboard() {
     const [showPrintModal, setShowPrintModal] = useState(false);
     const componentRef = React.useRef();
 
-    const handlePrint = () => {
-        window.print();
+    // Scan Ref
+    const scanInputRef = React.useRef(null);
+
+    // Auto-focus logic for Scan Input
+    useEffect(() => {
+        // If on Scan tab and no modals are open, focus the input
+        // (Assuming isJobModalOpen is clear too, though irrelevant for scan tab usually)
+        if (activeTab === 'scan' && !showPrintModal) {
+            // We need access to OTHER modal states. 
+            // Since they are defined further down, we might need to move this effect or check specific variables if available in scope.
+            // Wait, 'isStatusModalOpen' is defined below?
+            // Checking file structure... state defs are usually at top.
+            // Let's check where 'isStatusModalOpen' is defined.
+            // It seems I need to check line numbers.
+            // Let's first just define the ref here.
+
+            // Actually, useEffect should be placed AFTER all state definitions to capture them.
+            // I'll place the ref here, and the useEffect LATER.
+        }
+    }, [activeTab, showPrintModal]); // Placeholder, will implement full logic below state defs.
+
+    const handlePrint = (e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setTimeout(() => {
+            window.print();
+        }, 100);
     };
 
 
-    // Initialize Jobs
-    const [jobs, setJobs] = useState(() => {
-        try {
-            const saved = localStorage.getItem('land_jobs');
-            return saved ? JSON.parse(saved) : INITIAL_JOBS;
-        } catch (e) {
-            console.error('Failed to parse jobs from localStorage', e);
-            return INITIAL_JOBS;
-        }
-    });
+    // Data State
+    const [jobs, setJobs] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     // Initialize Job Types
-    const [jobTypes, setJobTypes] = useState(() => {
-        try {
-            const saved = localStorage.getItem('land_job_types');
-            return saved ? JSON.parse(saved) : INITIAL_JOB_TYPES;
-        } catch (e) {
-            console.error('Failed to parse job types', e);
-            return INITIAL_JOB_TYPES;
-        }
-    });
+    const [jobTypes, setJobTypes] = useState(INITIAL_JOB_TYPES);
 
     // Initialize Workflows
-    const [workflows, setWorkflows] = useState(() => {
-        try {
-            const saved = localStorage.getItem('land_workflows');
-            return saved ? JSON.parse(saved) : INITIAL_WORKFLOWS;
-        } catch (e) {
-            console.error('Failed to parse workflows', e);
-            return INITIAL_WORKFLOWS;
-        }
-    });
+    const [workflows, setWorkflows] = useState(INITIAL_WORKFLOWS);
 
     // Initialize Dept Settings
-    const [deptSettings, setDeptSettings] = useState(() => {
-        try {
-            const saved = localStorage.getItem('deptSettings');
-            if (!saved) return INITIAL_DEPT_SETTINGS;
-            const parsed = JSON.parse(saved);
-            return parsed || INITIAL_DEPT_SETTINGS;
-        } catch (e) {
-            console.error('Failed to parse deptSettings', e);
-            return INITIAL_DEPT_SETTINGS;
-        }
-    });
+    const [deptSettings, setDeptSettings] = useState(INITIAL_DEPT_SETTINGS);
 
-    // Access Control & Data Preparation
-    const accessibleJobs = useMemo(() => {
-        if (!currentUser) return [];
-        // Admin sees all, Staff sees only their department(s)
-        if (currentUser.role === 'admin') return jobs;
-        return jobs.filter(j => currentUser.departments.includes(j.department));
-    }, [jobs, currentUser]);
-
-    // Stats Calculation (Based on accessibleJobs + Overview Filter)
-    const statsData = useMemo(() => {
-        // Filter by Overview Dept Filter First
-        const filtered = accessibleJobs.filter(j =>
-            filterOverviewDept === 'ทั้งหมด' || j.department === filterOverviewDept
-        );
-
-        const total = filtered.length;
-        const active = filtered.filter(j => j.status === 'active').length;
-        const pending = filtered.filter(j => j.status === 'pending').length;
-        const completed = filtered.filter(j => j.status === 'completed').length;
-
-        // Pie Chart Data
-        const pieData = [
-            { name: 'รอดำเนินการ', value: pending, color: '#ef6c00' },
-            { name: 'กำลังดำเนินการ', value: active, color: '#2e7d32' },
-            { name: 'เสร็จสิ้น', value: completed, color: '#1565c0' },
-        ].filter(d => d.value > 0);
-
-        // Bar Chart Data (Dept Workload - Split by Status)
-        const deptCounts = filtered.reduce((acc, job) => {
-            if (!acc[job.department]) {
-                acc[job.department] = { name: job.department, completed: 0, ongoing: 0 };
-            }
-            if (job.status === 'completed') {
-                acc[job.department].completed += 1;
-            } else {
-                acc[job.department].ongoing += 1;
-            }
-            return acc;
-        }, {});
-        const barData = Object.values(deptCounts);
-
-        // Assignee Workload Data (Split by Status)
-        const assigneeCounts = filtered.reduce((acc, job) => {
-            const assignees = (job.assignees && job.assignees.length > 0) ? job.assignees : ['ไม่ระบุ'];
-
-            assignees.forEach(assignee => {
-                if (!acc[assignee]) {
-                    acc[assignee] = { name: assignee, completed: 0, ongoing: 0, total: 0 };
-                }
-                if (job.status === 'completed') {
-                    acc[assignee].completed += 1;
-                } else {
-                    acc[assignee].ongoing += 1;
-                }
-                acc[assignee].total += 1;
-            });
-            return acc;
-        }, {});
-
-        const assigneeData = Object.values(assigneeCounts)
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 10); // Top 10
-
-        return { total, active, pending, completed, pieData, barData, assigneeData };
-    }, [accessibleJobs, filterOverviewDept]);
-
-    // Auth Check
+    // Load Settings on Mount
     useEffect(() => {
-        const user = getCurrentUser();
-        if (!user) {
-            navigate('/admin');
-        } else {
-            setCurrentUser(user);
-        }
-    }, [navigate]);
+        const loadSettings = async () => {
+            // 1. Job Types
+            const fetchedJobTypes = await fetchAppSetting('job_types', INITIAL_JOB_TYPES);
+            setJobTypes(fetchedJobTypes);
 
-    const handleLogout = () => {
-        logout();
-        navigate('/admin');
+            // 2. Workflows
+            const fetchedWorkflows = await fetchAppSetting('workflows', INITIAL_WORKFLOWS);
+            setWorkflows(fetchedWorkflows);
+
+            // 3. Dept Settings (Officers, Warnings)
+            const fetchedDeptSettings = await fetchAppSetting('dept_settings', INITIAL_DEPT_SETTINGS);
+            setDeptSettings(fetchedDeptSettings);
+
+            // 4. Departments List (Dynamic!)
+            // We need to import getDepartments or define default.
+            // Importing getDepartments from auth.js which returns the default array.
+            const defaultDepts = ['ฝ่ายทะเบียน', 'ฝ่ายรังวัด', 'กลุ่มงานวิชาการที่ดิน', 'ฝ่ายอำนวยการ'];
+            const fetchedDepts = await fetchAppSetting('departments', defaultDepts);
+            // We need a state for departments in AdminDashboard to pass it down
+            setDepartments(fetchedDepts);
+        };
+        loadSettings();
+    }, []);
+
+    // New State for Departments
+    const [departments, setDepartments] = useState(['ฝ่ายทะเบียน', 'ฝ่ายรังวัด', 'กลุ่มงานวิชาการที่ดิน', 'ฝ่ายอำนวยการ']);
+
+    // Wrappers to save to DB when updated
+    const handleUpdateJobTypes = (newValOrFunc) => {
+        setJobTypes(prev => {
+            const newVal = typeof newValOrFunc === 'function' ? newValOrFunc(prev) : newValOrFunc;
+            saveAppSetting('job_types', newVal); // Fire and forget
+            return newVal;
+        });
     };
 
-    // Effects for saving data
-    useEffect(() => { localStorage.setItem('land_jobs', JSON.stringify(jobs)); }, [jobs]);
-    useEffect(() => { localStorage.setItem('land_job_types', JSON.stringify(jobTypes)); }, [jobTypes]);
-    useEffect(() => { localStorage.setItem('land_workflows', JSON.stringify(workflows)); }, [workflows]);
+    const handleUpdateWorkflows = (newValOrFunc) => {
+        setWorkflows(prev => {
+            const newVal = typeof newValOrFunc === 'function' ? newValOrFunc(prev) : newValOrFunc;
+            saveAppSetting('workflows', newVal);
+            return newVal;
+        });
+    };
+
+    const handleUpdateDeptSettings = (newValOrFunc) => {
+        setDeptSettings(prev => {
+            const newVal = typeof newValOrFunc === 'function' ? newValOrFunc(prev) : newValOrFunc;
+            saveAppSetting('dept_settings', newVal);
+            return newVal;
+        });
+    };
+
+
+
+    // Helper to map DB record to UI model
+    const mapRecordToJob = (record) => {
+        return {
+            id: record.id,
+            receptionNo: record.reception_no,
+            date: record.date,
+            department: record.department,
+            type: record.job_type,
+            owner: record.owner,
+            status: record.status,
+            step: record.step || '-',
+            note: record.note || '',
+            completedAt: record.completed_at || null, // Smart Data: track completion date
+            assignees: Array.isArray(record.assignees) ? record.assignees : [],
+            assigneesIds: []
+        };
+    };
+
+    // Fetch Jobs from PocketBase
     useEffect(() => {
-        if (deptSettings) localStorage.setItem('deptSettings', JSON.stringify(deptSettings));
-    }, [deptSettings]);
+        const fetchJobs = async () => {
+            try {
+                const records = await pb.collection('jobs').getFullList({
+                    sort: '-created'
+                });
+                setJobs(records.map(mapRecordToJob));
+                setLoading(false);
+            } catch (err) {
+                console.error("Error fetching jobs:", err);
+                setLoading(false);
+            }
+        };
+
+        fetchJobs();
+
+        // Real-time Subscription
+        pb.collection('jobs').subscribe('*', async (e) => {
+            if (e.action === 'create') {
+                // But safest is to fetch the single record expanded (Wait, no expand needed for JSON assignees)
+                const newRecord = await pb.collection('jobs').getOne(e.record.id);
+                setJobs(prev => [mapRecordToJob(newRecord), ...prev]);
+            } else if (e.action === 'update') {
+                const updatedRecord = await pb.collection('jobs').getOne(e.record.id);
+                setJobs(prev => prev.map(job => job.id === e.record.id ? mapRecordToJob(updatedRecord) : job));
+            } else if (e.action === 'delete') {
+                setJobs(prev => prev.filter(job => job.id !== e.record.id));
+            }
+        });
+
+        return () => {
+            pb.collection('jobs').unsubscribe();
+        };
+    }, []);
+
+    // Stats Calculation
+    const statsData = useMemo(() => {
+        const targetJobs = filterOverviewDept === 'ทั้งหมด'
+            ? jobs
+            : jobs.filter(j => j.department === filterOverviewDept);
+
+        const total = targetJobs.length;
+        const active = targetJobs.filter(j => j.status === 'active').length;
+        const pending = targetJobs.filter(j => j.status === 'pending').length;
+        const completed = targetJobs.filter(j => j.status === 'completed').length;
+
+        // Pie Data
+        const pieData = [
+            { name: 'กำลังดำเนินการ', value: active, color: '#FF9800' },
+            { name: 'รอดำเนินการ', value: pending, color: '#F44336' },
+            { name: 'เสร็จสิ้น', value: completed, color: '#4CAF50' }
+        ].filter(d => d.value > 0);
+
+        // Bar Data (Department Workload)
+        const barData = PROVINCES.slice(1).map(dept => {
+            // Note: Filter against all jobs or targetJobs? 
+            // If filterOverviewDept is selected, bar chart might show only that dept or all.
+            // Usually dashboard overview charts show breakdown. If I filter by dept, 
+            // showing other depts with 0 might be weird, or maybe valid.
+            // Let's stick to 'targetJobs' usage for consistency with the filter.
+            // If 'All' is selected, targetJobs is all jobs.
+            // If specific dept selected, targetJobs is only that dept's jobs.
+            // So bar chart will show only one bar with data if filtered.
+            const deptJobs = targetJobs.filter(j => j.department === dept);
+            return {
+                name: dept,
+                completed: deptJobs.filter(j => j.status === 'completed').length,
+                ongoing: deptJobs.filter(j => j.status !== 'completed').length
+            };
+        });
+
+        // Assignee Data
+        const assigneeStats = {};
+        targetJobs.forEach(job => {
+            if (job.assignees && Array.isArray(job.assignees)) {
+                job.assignees.forEach(assigneeName => {
+                    if (!assigneeStats[assigneeName]) {
+                        assigneeStats[assigneeName] = { name: assigneeName, completed: 0, ongoing: 0 };
+                    }
+                    if (job.status === 'completed') {
+                        assigneeStats[assigneeName].completed++;
+                    } else {
+                        assigneeStats[assigneeName].ongoing++;
+                    }
+                });
+            }
+        });
+        const assigneeData = Object.values(assigneeStats)
+            .sort((a, b) => (b.completed + b.ongoing) - (a.completed + a.ongoing))
+            .slice(0, 10);
+
+        return { total, active, pending, completed, pieData, barData, assigneeData };
+    }, [jobs, filterOverviewDept]);
 
     // Modals state
     const [isJobModalOpen, setIsJobModalOpen] = useState(false);
@@ -280,9 +399,61 @@ export default function AdminDashboard() {
     // Bulk selection state
     const [selectedJobIds, setSelectedJobIds] = useState([]);
 
+    // EFFECT: Auto-focus Scan Input when active and no modals are open
+    useEffect(() => {
+        if (activeTab === 'scan' && !isStatusModalOpen && !isJobModalOpen && !showPrintModal) {
+            // Tiny timeout to ensure DOM is ready or modal is fully gone
+            // Using requestAnimationFrame or small timeout
+            const timer = setTimeout(() => {
+                if (scanInputRef.current) {
+                    scanInputRef.current.focus();
+                }
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [activeTab, isStatusModalOpen, isJobModalOpen, showPrintModal]);
+
+    // Collect all unique officers for filter
+    const allOfficers = useMemo(() => {
+        const officers = new Set();
+
+        // Determine allowed departments
+        let allowedDepts = [];
+        if (currentUser?.role === 'admin') {
+            allowedDepts = Object.keys(deptSettings);
+        } else if (currentUser?.departments) {
+            allowedDepts = currentUser.departments;
+        }
+
+        Object.entries(deptSettings).forEach(([deptName, deptData]) => {
+            // Only include officers from allowed departments
+            if (allowedDepts.includes(deptName) && deptData.officers) {
+                deptData.officers.forEach(o => officers.add(o.name));
+            }
+        });
+        return Array.from(officers).sort();
+    }, [deptSettings, currentUser]);
+
+    const handleClearFilters = () => {
+        setSearchTerm('');
+        setFilterDept('ทั้งหมด');
+        setFilterStatus('ทั้งหมด');
+        setFilterAssignee('ทั้งหมด');
+        setFilterStartDate('');
+        setFilterEndDate('');
+    };
+
     // Filter Logic
     const filteredJobs = useMemo(() => {
         return jobs.filter(job => {
+            // Permission Filter: Check if user is allowed to see this department
+            if (currentUser?.role !== 'admin') {
+                const allowedDepts = currentUser?.departments || [];
+                if (!allowedDepts.includes(job.department)) {
+                    return false; // Hide if not in allowed departments
+                }
+            }
+
             const matchesSearch =
                 job.receptionNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 job.owner.toLowerCase().includes(searchTerm.toLowerCase());
@@ -290,12 +461,52 @@ export default function AdminDashboard() {
             const matchesDept = filterDept === 'ทั้งหมด' || job.department === filterDept;
             const matchesStatus = filterStatus === 'ทั้งหมด' || job.status === filterStatus;
 
-            return matchesSearch && matchesDept && matchesStatus;
-        });
-    }, [jobs, searchTerm, filterDept, filterStatus]);
+            // Assignee Filter
+            const matchesAssignee = filterAssignee === 'ทั้งหมด' ||
+                (job.assignees && job.assignees.includes(filterAssignee));
 
-    // If not logged in, render nothing while redirecting
-    if (!currentUser) return null;
+            // Date Range Filter
+            let matchesDate = true;
+            if (filterStartDate || filterEndDate) {
+                if (!job.date) {
+                    matchesDate = false;
+                } else {
+                    const jobDate = new Date(job.date);
+                    // Reset time for accurate comparison
+                    jobDate.setHours(0, 0, 0, 0);
+
+                    if (filterStartDate) {
+                        const start = new Date(filterStartDate);
+                        start.setHours(0, 0, 0, 0);
+                        if (jobDate < start) matchesDate = false;
+                    }
+                    if (filterEndDate) {
+                        const end = new Date(filterEndDate);
+                        end.setHours(0, 0, 0, 0);
+                        if (jobDate > end) matchesDate = false;
+                    }
+                }
+            }
+
+            return matchesSearch && matchesDept && matchesStatus && matchesAssignee && matchesDate;
+        });
+    }, [jobs, searchTerm, filterDept, filterStatus, filterAssignee, filterStartDate, filterEndDate, currentUser]);
+
+    // If not logged in, show debug or redirecting message
+    if (!currentUser) {
+        return (
+            <div style={{ padding: '40px', textAlign: 'center' }}>
+                <h2>กำลังตรวจสอบสิทธิ์...</h2>
+                <p>หากหน้านี้ค้างอยู่นาน กรุณากดปุ่มด้านล่างเพื่อเข้าสู่ระบบใหม่</p>
+                <button
+                    onClick={() => navigate('/admin')}
+                    style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: 20 }}
+                >
+                    เข้าสู่ระบบใหม่
+                </button>
+            </div>
+        );
+    }
 
     // Thai Date Helper
     const formatThaiDate = (dateString) => {
@@ -341,10 +552,14 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleBulkDelete = () => {
+    const handleBulkDelete = async () => {
         if (window.confirm(`คุณต้องการลบงานที่เลือกจำนวน ${selectedJobIds.length} รายการใช่หรือไม่?`)) {
-            setJobs(jobs.filter(job => !selectedJobIds.includes(job.id)));
-            setSelectedJobIds([]);
+            try {
+                await Promise.all(selectedJobIds.map(id => pb.collection('jobs').delete(id)));
+                setSelectedJobIds([]);
+            } catch (err) {
+                alert('An error occurred while deleting: ' + err.message);
+            }
         }
     };
 
@@ -364,39 +579,68 @@ export default function AdminDashboard() {
 
     // Open "Edit Info"
     const openEditInfo = (job) => {
-        setEditingJob(job);
+        // We need to pass IDs to the modal for checkboxes to work
+        const jobWithIds = {
+            ...job,
+            assignees: job.assigneesIds || [] // Use stored IDs
+        };
+        setEditingJob(jobWithIds);
         setIsJobModalOpen(true);
     };
 
     // Handle Add or Edit Submit
-    const handleJobSubmit = (formData) => {
-        let newJobData;
-        if (editingJob) {
-            // Update existing
-            newJobData = { ...editingJob, ...formData };
-            setJobs(jobs.map(j => j.id === editingJob.id ? newJobData : j));
-        } else {
-            // Create new
-            const deptWorkflow = workflows[formData.department] || [];
-            const initialStep = deptWorkflow.length > 0 ? deptWorkflow[0].name : 'รับเรื่อง';
+    const handleJobSubmit = async (formData) => {
+        try {
+            // Note: assignees in formData usually comes as an array of names or IDs depending on AddJobModal implementation.
+            // Since we haven't updated AddJobModal fully to return IDs, we might need adjustments there.
+            // Assumption: AddJobModal will return 'assignees' array. We need to handle mapping if they are objects.
 
-            newJobData = {
-                ...formData,
-                id: jobs.length + 1,
-                status: 'pending',
-                step: initialStep
+            // Map keys to API schema (snake_case)
+            const apiData = {
+                reception_no: formData.receptionNo,
+                date: formData.date,
+                department: formData.department,
+                job_type: formData.type || formData.job_type,
+                owner: formData.owner,
+                status: formData.status || 'active',
+                step: formData.step,
+                assignees: formData.assignees || [] // Send IDs directly
             };
-            setJobs([newJobData, ...jobs]);
+
+            let newJobEntry;
+
+            if (editingJob) {
+                // Update
+                newJobEntry = await pb.collection('jobs').update(editingJob.id, apiData);
+            } else {
+                // Create
+                const deptWorkflow = workflows[formData.department] || [];
+                const initialStep = deptWorkflow.length > 0 ? deptWorkflow[0].name : 'รับเรื่อง';
+
+                apiData.status = 'active';
+                apiData.step = initialStep;
+
+                newJobEntry = await pb.collection('jobs').create(apiData);
+            }
+
+            // We need the expanded version for our UI state (though subscription handles it too, nice to have immeditae feedback)
+            const expandedRec = await pb.collection('jobs').getOne(newJobEntry.id);
+            const processedJob = mapRecordToJob(expandedRec);
+
+            setIsJobModalOpen(false);
+            setEditingJob(null);
+
+            // Open Print Modal for Success
+            setJobToPrint(processedJob);
+            setShowPrintModal(true);
+
+        } catch (err) {
+            console.error("Error saving job:", err);
+            // Show detailed error from PocketBase if available
+            const details = err.data ? JSON.stringify(err.data, null, 2) : err.message;
+            alert("Error saving: " + details);
         }
-        setIsJobModalOpen(false); // Ensure modal closes
-        setEditingJob(null);
-
-        // Open Print Modal for Success
-        setJobToPrint(newJobData);
-        setShowPrintModal(true);
     };
-
-    // ... (rest of the file)
 
     const handleAddJob = (data) => handleJobSubmit(data);
     const handleEditJob = (data) => handleJobSubmit(data);
@@ -407,18 +651,64 @@ export default function AdminDashboard() {
     };
 
     // Updated handleUpdateStatus to support bulk
-    const handleUpdateStatus = (updatedJobOrJobs) => {
-        if (Array.isArray(updatedJobOrJobs)) {
-            // Bulk update
-            const updatedIds = updatedJobOrJobs.map(j => j.id);
-            setJobs(jobs.map(j => {
-                const updated = updatedJobOrJobs.find(u => u.id === j.id);
-                return updated ? updated : j;
-            }));
-            setSelectedJobIds([]); // Clear selection after update
-        } else {
-            // Single update
-            setJobs(jobs.map(j => j.id === updatedJobOrJobs.id ? updatedJobOrJobs : j));
+    const handleUpdateStatus = async (updatedJobOrJobs) => {
+        try {
+            if (Array.isArray(updatedJobOrJobs)) {
+                // Bulk update
+                // 'updatedJobOrJobs' here comes from UpdateStatusModal which likely returns the modified local objects.
+                // We need to extract what changed (status/step) and call API.
+                // Assuming UpdateStatusModal returns fully updated objects.
+
+                // Caveat: UpdateStatusModal logic needs check.
+                // If it passes full objects, we iterate and update.
+                const updatePromises = updatedJobOrJobs.map(job => {
+                    const updateData = {
+                        status: job.status,
+                        step: job.step,
+                        note: job.note
+                    };
+                    // Smart Data: Set completed_at when status becomes 'completed'
+                    if (job.status === 'completed') {
+                        updateData.completed_at = new Date().toISOString();
+                    }
+                    return pb.collection('jobs').update(job.id, updateData);
+                });
+                await Promise.all(updatePromises);
+                setSelectedJobIds([]);
+            } else {
+                // Single update
+                const updateData = {
+                    status: updatedJobOrJobs.status,
+                    step: updatedJobOrJobs.step,
+                    note: updatedJobOrJobs.note
+                };
+                // Smart Data: Set completed_at when status becomes 'completed'
+                if (updatedJobOrJobs.status === 'completed') {
+                    updateData.completed_at = new Date().toISOString();
+                }
+                await pb.collection('jobs').update(updatedJobOrJobs.id, updateData);
+            }
+        } catch (err) {
+            console.error("Error updating status:", err);
+            console.error("Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+
+            // PocketBase errors can be in different formats
+            let errorMessage = 'Unknown error';
+
+            if (err.response?.data) {
+                // PocketBase ClientResponseError
+                errorMessage = JSON.stringify(err.response.data, null, 2);
+            } else if (err.data) {
+                errorMessage = JSON.stringify(err.data, null, 2);
+            } else if (err.message) {
+                errorMessage = err.message;
+            } else if (err.originalError) {
+                errorMessage = err.originalError.message || JSON.stringify(err.originalError);
+            } else if (typeof err === 'object') {
+                errorMessage = JSON.stringify(err, null, 2);
+            }
+
+            alert("Error updating status: " + errorMessage);
         }
     };
 
@@ -427,7 +717,9 @@ export default function AdminDashboard() {
             {/* Sidebar */}
             <aside className="sidebar">
                 <div className="sidebar-logo">
-                    <div className="logo-box">L</div>
+                    <div className="logo-box-img">
+                        <img src="/dol_logo.png" alt="DOL Logo" />
+                    </div>
                     <span className="sidebar-title">Admin Panel</span>
                 </div>
 
@@ -449,12 +741,40 @@ export default function AdminDashboard() {
                     </div>
 
                     <div
-                        className={`nav-item ${activeTab === 'users' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('users')}
+                        className={`nav-item ${activeTab === 'scan' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('scan')}
                     >
-                        <Users size={20} />
-                        <span>ผู้ใช้งาน</span>
+                        <ScanBarcode size={20} />
+                        <span>สแกนบาร์โค้ด</span>
                     </div>
+
+                    <div
+                        className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('reports')}
+                    >
+                        <BarChart2 size={20} />
+                        <span>รายงาน</span>
+                    </div>
+
+                    {currentUser?.role === 'admin' && (
+                        <div
+                            className={`nav-item ${activeTab === 'users' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('users')}
+                        >
+                            <Users size={20} />
+                            <span>ผู้ใช้งาน</span>
+                        </div>
+                    )}
+
+                    {currentUser?.role === 'admin' && (
+                        <div
+                            className={`nav-item ${activeTab === 'smartdata' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('smartdata')}
+                        >
+                            <Archive size={20} />
+                            <span>Smart Data</span>
+                        </div>
+                    )}
 
                     <div
                         className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
@@ -491,7 +811,7 @@ export default function AdminDashboard() {
                                 onChange={(e) => setFilterOverviewDept(e.target.value)}
                             >
                                 <option value="ทั้งหมด">ทุกฝ่าย</option>
-                                {currentUser?.departments.map(dept => (
+                                {currentUser?.departments?.map(dept => (
                                     <option key={dept} value={dept}>{dept}</option>
                                 ))}
                             </select>
@@ -612,37 +932,104 @@ export default function AdminDashboard() {
 
                         {/* Filters */}
                         <div className="filter-bar">
-                            <div className="search-input-wrapper">
-                                <Search className="search-icon" size={18} />
-                                <input
-                                    type="text"
-                                    className="search-input"
-                                    placeholder="ค้นหาตามเลขที่คำขอ หรือ ชื่อผู้ยื่น..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+                                <div className="search-input-wrapper" style={{ flex: '1 1 300px' }}>
+                                    <Search className="search-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="search-input"
+                                        placeholder="ค้นหาตามเลขที่คำขอ หรือ ชื่อผู้ยื่น..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+
+                                <select
+                                    className="filter-select"
+                                    value={filterDept}
+                                    onChange={(e) => setFilterDept(e.target.value)}
+                                    style={{ flex: '0 1 auto' }}
+                                >
+                                    {PROVINCES.filter(dept => {
+                                        if (dept === 'ทั้งหมด') return true; // Always show "All" option if present (Wait, PROVINCES usually doesn't have 'ทั้งหมด')
+                                        // Actually PROVINCES is just the list of depts. 
+                                        // We should add an "All" option manually or check if PROVINCES has it.
+                                        // Checking previous code, PROVINCES is imported. Let's assume it's just names.
+
+                                        if (currentUser?.role === 'admin') return true;
+                                        return currentUser?.departments?.includes(dept);
+                                    }).map(dept => (
+                                        <option key={dept} value={dept}>{dept}</option>
+                                    ))}
+                                </select>
+
+                                <select
+                                    className="filter-select"
+                                    value={filterAssignee}
+                                    onChange={(e) => setFilterAssignee(e.target.value)}
+                                    style={{ flex: '0 1 auto' }}
+                                >
+                                    <option value="ทั้งหมด">ผู้รับผิดชอบทั้งหมด</option>
+                                    {allOfficers.map((officer, idx) => (
+                                        <option key={`${officer}-${idx}`} value={officer}>{officer}</option>
+                                    ))}
+                                </select>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input
+                                        type="date"
+                                        className="filter-select"
+                                        style={{ minWidth: 'auto' }}
+                                        value={filterStartDate}
+                                        onChange={(e) => setFilterStartDate(e.target.value)}
+                                        title="วันที่เริ่มต้น"
+                                    />
+                                    <span style={{ color: '#64748b' }}>-</span>
+                                    <input
+                                        type="date"
+                                        className="filter-select"
+                                        style={{ minWidth: 'auto' }}
+                                        value={filterEndDate}
+                                        onChange={(e) => setFilterEndDate(e.target.value)}
+                                        title="ถึงวันที่"
+                                    />
+                                </div>
+
+                                <select
+                                    className="filter-select"
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    style={{ flex: '0 1 auto' }}
+                                >
+                                    <option value="ทั้งหมด">สถานะทั้งหมด</option>
+                                    <option value="active">กำลังดำเนินการ</option>
+                                    <option value="completed">เสร็จสิ้น</option>
+                                </select>
+
+                                <button
+                                    onClick={handleClearFilters}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '10px 16px',
+                                        background: '#fff',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        color: '#64748b',
+                                        fontWeight: 500,
+                                        fontSize: '0.95rem',
+                                        transition: 'all 0.2s',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#475569'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#64748b'; }}
+                                >
+                                    <X size={18} />
+                                    ล้างตัวกรอง
+                                </button>
                             </div>
-
-                            <select
-                                className="filter-select"
-                                value={filterDept}
-                                onChange={(e) => setFilterDept(e.target.value)}
-                            >
-                                {PROVINCES.map(dept => (
-                                    <option key={dept} value={dept}>{dept}</option>
-                                ))}
-                            </select>
-
-                            <select
-                                className="filter-select"
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                            >
-                                <option value="ทั้งหมด">สถานะทั้งหมด</option>
-                                <option value="active">กำลังดำเนินการ</option>
-                                <option value="pending">รอดำเนินการ</option>
-                                <option value="completed">เสร็จสิ้น</option>
-                            </select>
                         </div>
 
                         {/* Bulk Action Bar */}
@@ -678,7 +1065,7 @@ export default function AdminDashboard() {
                                         <th>เลขที่/วันที่</th>
                                         <th>รายละเอียด</th>
                                         <th>ผู้ยื่น/ผู้รับผิดชอบ</th>
-                                        <th>ขั้นตอนปัจจุบัน</th>
+                                        <th>ขั้นตอน</th>
                                         <th>จัดการ</th>
                                     </tr>
                                 </thead>
@@ -701,7 +1088,22 @@ export default function AdminDashboard() {
                                                     />
                                                 </td>
                                                 <td style={{ verticalAlign: 'top' }}>
-                                                    <span className={`status-badge ${job.status}`}>
+                                                    <span
+                                                        className={`status-badge ${job.status}`}
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '6px',
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 600,
+                                                            lineHeight: 1.2,
+                                                            whiteSpace: 'nowrap',
+                                                            backgroundColor: job.status === 'active' ? '#dbeafe' : job.status === 'pending' ? '#ffedd5' : '#dcfce7',
+                                                            color: job.status === 'active' ? '#1e40af' : job.status === 'pending' ? '#9a3412' : '#166534',
+                                                            border: `1px solid ${job.status === 'active' ? '#bfdbfe' : job.status === 'pending' ? '#fed7aa' : '#bbf7d0'}`
+                                                        }}
+                                                    >
                                                         {job.status === 'active' ? 'กำลังดำเนินการ' :
                                                             job.status === 'pending' ? 'รอดำเนินการ' : 'เสร็จสิ้น'}
                                                     </span>
@@ -755,11 +1157,9 @@ export default function AdminDashboard() {
                                                     <div style={{ display: 'flex', gap: 6 }}>
                                                         <button
                                                             className="action-button"
-                                                            onClick={() => {
+                                                            onClick={(e) => {
                                                                 setJobToPrint(job);
-                                                                handlePrint(); // Or setShowPrintModal(true) if you prefer the confirmation
-                                                                // Usually direct print is faster for on-demand
-                                                                setTimeout(() => window.print(), 100);
+                                                                handlePrint(e);
                                                             }}
                                                             title="พิมพ์ใบนัด"
                                                         >
@@ -790,20 +1190,79 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {activeTab === 'users' && (
+                {activeTab === 'users' && currentUser?.role === 'admin' && (
                     <UserManagement />
                 )}
 
                 {activeTab === 'settings' && (
                     <WorkflowEditor
                         deptSettings={deptSettings}
-                        onUpdateSettings={setDeptSettings}
+                        onUpdateSettings={handleUpdateDeptSettings}
                         workflows={workflows}
-                        onUpdateWorkflows={setWorkflows}
+                        onUpdateWorkflows={handleUpdateWorkflows}
                         // New Props for Job Types
                         jobTypes={jobTypes}
-                        onUpdateJobTypes={setJobTypes}
+                        onUpdateJobTypes={handleUpdateJobTypes}
                         currentUser={currentUser}
+                        departments={departments}
+
+                    />
+                )}
+
+                {activeTab === 'reports' && (
+                    <Reports
+                        jobs={jobs}
+                        deptSettings={deptSettings}
+                        currentUser={currentUser}
+                    />
+                )}
+
+                {activeTab === 'scan' && (
+                    <div className="animate-fade-in-up" style={{ maxWidth: 600, margin: '40px auto', textAlign: 'center' }}>
+                        <div style={{ marginBottom: 32 }}>
+                            <div style={{
+                                width: 80, height: 80, background: 'var(--primary-color)',
+                                borderRadius: '50%', display: 'flex', alignItems: 'center',
+                                justifyContent: 'center', color: 'white', margin: '0 auto 16px'
+                            }}>
+                                <ScanBarcode size={40} />
+                            </div>
+                            <h2 style={{ fontSize: '1.8rem', marginBottom: 8 }}>สแกน QR Code / Barcode</h2>
+                            <p style={{ color: '#666' }}>ยิงบาร์โค้ดที่ใบนัดเพื่อ **อัปเดตสถานะงาน**</p>
+                        </div>
+
+                        <form onSubmit={handleScanSubmit}>
+                            <input
+                                ref={scanInputRef}
+                                autoFocus
+                                type="text"
+                                className="form-input"
+                                value={scanInput}
+                                onChange={(e) => setScanInput(e.target.value)}
+                                placeholder="รอรับข้อมูลจากเครื่องสแกน..."
+                                style={{
+                                    height: 60,
+                                    fontSize: '1.5rem',
+                                    textAlign: 'center',
+                                    marginBottom: 24,
+                                    border: '2px solid var(--primary-color)',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                }}
+                            />
+                            <div style={{ color: '#888', fontSize: '0.9rem' }}>
+                                (คลิกที่ช่องว่างแล้วยิงบาร์โค้ด หรือพิมพ์เลขที่คำขอแล้วกด Enter)
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                {/* Smart Data Tab */}
+                {activeTab === 'smartdata' && (
+                    <SmartDataManager
+                        jobs={jobs}
+                        onJobsDeleted={(deletedIds) => {
+                            setJobs(prev => prev.filter(j => !deletedIds.includes(j.id)));
+                        }}
                     />
                 )}
             </main>
@@ -817,6 +1276,7 @@ export default function AdminDashboard() {
                 deptSettings={deptSettings}
                 jobTypes={jobTypes}
                 jobs={jobs}
+                currentUser={currentUser}
             />
 
             {/* Status Update Modal */}

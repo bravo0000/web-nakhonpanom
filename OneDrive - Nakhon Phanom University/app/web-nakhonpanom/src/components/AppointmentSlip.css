@@ -68,4 +68,10 @@
         color: black;
         line-height: 1.2;
     }
+
+    .barcode-box {
+        position: fixed;
+        bottom: 1cm;
+        left: 1cm;
+    }
 }

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import Layout from '../components/Layout';
-import { Search, Calendar, FileText, Check, Clock, MapPin } from 'lucide-react';
-import ThaiDatePicker from '../components/ThaiDatePicker';
+import { Search, FileText, Check, Clock, MapPin, Phone } from 'lucide-react';
+import { fetchAppSetting } from '../utils/auth';
+import pb from '../lib/pocketbase';
 import './PublicTracking.css';
 
 // Mock Workflows (Should match WorkflowEditor)
@@ -71,7 +73,6 @@ const MOCK_JOBS_DB = [
 
 export default function PublicTracking() {
     const [receptionNo, setReceptionNo] = useState('');
-    const [date, setDate] = useState('');
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -86,70 +87,88 @@ export default function PublicTracking() {
         });
     };
 
-    const handleAutoSearch = (recNo) => {
+    const handleAutoSearch = async (recNo) => {
         setLoading(true);
         setResult(null);
         setError('');
 
-        setTimeout(() => {
-            // Load jobs from LocalStorage (Sync with Admin Dashboard)
-            let jobsDB = MOCK_JOBS_DB;
-            let workflowsDB = MOCK_WORKFLOWS;
+        try {
+            // 1. Fetch Job from PocketBase (Case-Insensitive search via OR)
+            // Use OR logic because :lower might not be supported on this PB version
+            const filter = `reception_no="${recNo}" || reception_no="${recNo.toLowerCase()}" || reception_no="${recNo.toUpperCase()}"`;
+            const record = await pb.collection('jobs').getFirstListItem(filter);
 
-            try {
-                const savedJobs = localStorage.getItem('land_jobs');
-                if (savedJobs) jobsDB = JSON.parse(savedJobs);
-
-                const savedWorkflows = localStorage.getItem('land_workflows');
-                if (savedWorkflows) workflowsDB = JSON.parse(savedWorkflows);
-            } catch (e) {
-                console.error('Data load error', e);
-            }
-
-            const foundJob = jobsDB.find(job => job.receptionNo === recNo);
-            if (foundJob) {
-                // Generate timeline based on department workflow
-                const workflow = workflowsDB[foundJob.department] || workflowsDB['ฝ่ายทะเบียน'];
-                const timeline = workflow.map((step, index) => {
-                    let status = 'pending';
-                    // Allow job.step (string name) to override index logic if present
-                    if (foundJob.step) {
-                        const stepIndex = workflow.findIndex(s => s.name === foundJob.step);
-                        if (index < stepIndex) status = 'completed';
-                        else if (index === stepIndex) status = foundJob.status === 'completed' ? 'completed' : 'active';
-                    } else if (foundJob.currentStepIndex !== undefined) {
-                        // Fallback for legacy mock data
-                        if (index < foundJob.currentStepIndex) status = 'completed';
-                        else if (index === foundJob.currentStepIndex) status = 'active';
-                    }
-
-                    return {
-                        id: step.id,
-                        name: step.name,
-                        date: status === 'pending' ? '-' : 'ดำเนินการแล้ว',
-                        status
-                    };
-                });
-
-                setResult({ ...foundJob, timeline });
-            } else {
+            if (!record) {
                 setError('ไม่พบข้อมูลตามเลขที่ที่ระบุ กรุณาตรวจสอบอีกครั้ง');
+                setLoading(false);
+                return;
             }
+
+            // 2. Map record to UI Job model
+            const foundJob = {
+                id: record.id,
+                receptionNo: record.reception_no,
+                date: record.date,
+                department: record.department,
+                type: record.job_type,
+                owner: record.owner,
+                status: record.status,
+                step: record.step,
+                note: record.note || '', // Added note field
+                assignees: Array.isArray(record.assignees) ? record.assignees : [] // JSON array of strings
+            };
+
+            // 3. Load Active Workflows from settings (fallback to Mock)
+            const workflowsDB = await fetchAppSetting('workflows', MOCK_WORKFLOWS);
+
+            // 4. Generate timeline based on department workflow
+            const workflow = workflowsDB[foundJob.department] || workflowsDB['ฝ่ายทะเบียน'];
+            const timeline = workflow.map((step, index) => {
+                let status = 'pending';
+                // Allow job.step (string name) to override index logic if present
+                if (foundJob.step) {
+                    const stepIndex = workflow.findIndex(s => s.name === foundJob.step);
+                    if (index < stepIndex) status = 'completed';
+                    else if (index === stepIndex) status = foundJob.status === 'completed' ? 'completed' : 'active';
+                }
+
+                return {
+                    id: step.id,
+                    name: step.name,
+                    date: status === 'pending' ? '-' : 'ดำเนินการแล้ว',
+                    status
+                };
+            });
+
+            setResult({ ...foundJob, timeline });
+
+        } catch (err) {
+            console.error('Data load error', err);
+            if (err.status === 404) {
+                setError('ไม่พบข้อมูลตามเลขที่ที่ระบุ กรุณาตรวจสอบอีกครั้ง');
+            } else if (err.status === 403 || err.status === 400) {
+                setError('ระบบไม่อนุญาตให้เข้าถึงข้อมูล (กรุณาตรวจสอบ API Rules ใน PocketBase)');
+            } else {
+                setError('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + (err.message || 'โปรดตรวจสอบ Server หรือ Internet'));
+            }
+        } finally {
             setLoading(false);
-        }, 800);
-    }
+        }
+    };
+
+    // 0. Use useSearchParams hook
+    const [searchParams] = useSearchParams();
 
     // Auto-search from URL params
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const receptionNoParam = params.get('receptionNo');
+        const receptionNoParam = searchParams.get('receptionNo');
 
         if (receptionNoParam) {
             setReceptionNo(receptionNoParam);
             // Trigger search automatically
             handleAutoSearch(receptionNoParam);
         }
-    }, []);
+    }, [searchParams]);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -173,8 +192,8 @@ export default function PublicTracking() {
 
                 <div className="tracking-wrapper">
                     <h1 className="tracking-title animate-fade-in-up">
-                        ติดตามสถานะ<br />
-                        <span className="text-gradient">คำขอสำนักงานที่ดิน</span>
+                        <span style={{ fontSize: '0.85em', fontWeight: 500, display: 'block', marginBottom: 8 }}>ติดตามสถานะคำขอ</span>
+                        <span className="text-gradient">สำนักงานที่ดินจังหวัดนครพนม</span>
                     </h1>
                     <p className="tracking-subtitle animate-fade-in-up delay-100">
                         กรอกเลขที่รับเรื่องและวันที่เพื่อดูความคืบหน้าแบบ Real-time
@@ -197,14 +216,7 @@ export default function PublicTracking() {
                                 </div>
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">วันที่รับเรื่อง</label>
-                                <ThaiDatePicker
-                                    value={date}
-                                    onChange={setDate}
-                                    placeholder="เลือกวันที่ (วว/ดด/ปปปป)"
-                                />
-                            </div>
+                            {/* Date Field Removed as per request */}
 
                             {error && <div style={{ color: '#d32f2f', marginBottom: 12, fontSize: '0.9rem' }}>{error}</div>}
 
@@ -271,6 +283,19 @@ export default function PublicTracking() {
                                 })}
                             </div>
 
+                            {/* Note Section */}
+                            {result.note && (
+                                <div className="note-card animate-fade-in-up delay-200" style={{ marginTop: 20, padding: 16, background: '#fff3e0', borderRadius: 12, borderLeft: '4px solid #ff9800' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                        <div style={{ color: '#f57c00' }}><FileText size={20} /></div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, color: '#e65100', marginBottom: 4 }}>หมายเหตุ / แจ้งเตือน:</div>
+                                            <div style={{ color: '#5d4037', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{result.note}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Responsible Officer Footer */}
                             <div className="job-footer" style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
@@ -302,11 +327,11 @@ function ContactButton({ officerName, department }) {
     const [phone, setPhone] = useState('');
 
     useEffect(() => {
-        // Load settings from localStorage to find phone number
-        try {
-            const saved = localStorage.getItem('deptSettings');
-            if (saved) {
-                const settings = JSON.parse(saved);
+        const loadPhone = async () => {
+            try {
+                // Fetch settings via auth utility (cached)
+                const settings = await fetchAppSetting('dept_settings', {});
+
                 if (settings) {
                     const deptData = settings[department];
                     if (deptData && deptData.officers) {
@@ -315,26 +340,35 @@ function ContactButton({ officerName, department }) {
                         if (officer && officer.phone) {
                             setPhone(officer.phone);
                         } else {
-                            // Fallback to first officer or department default if we had one
+                            // Fallback to first officer phone or default
                             setPhone(deptData.officers[0]?.phone || '042-511-200');
                         }
                     }
                 }
+            } catch (e) {
+                console.error('Error loading contact info', e);
             }
-        } catch (e) {
-            console.error('Error loading contact info', e);
-        }
+        };
+
+        loadPhone();
     }, [officerName, department]);
 
     if (showPhone) {
         return (
-            <div style={{
-                background: '#f0fdf4', color: '#166534',
-                padding: '10px 20px', borderRadius: 8,
-                fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8
-            }}>
-                <span>📞 โทร: {phone || 'ไม่พบเบอร์โทร'}</span>
-            </div>
+            <a
+                href={phone ? `tel:${phone.replace(/[^0-9+]/g, '')}` : '#'}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: '#10b981', color: 'white',
+                    padding: '12px 20px', borderRadius: 12,
+                    fontWeight: 600, textDecoration: 'none',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                    transition: 'all 0.2s'
+                }}
+            >
+                <Phone size={20} />
+                <span>{phone || 'ไม่พบเบอร์โทร'}</span>
+            </a>
         );
     }
 
@@ -342,12 +376,14 @@ function ContactButton({ officerName, department }) {
         <button
             onClick={() => setShowPhone(true)}
             style={{
+                display: 'flex', alignItems: 'center', gap: 8,
                 background: 'var(--accent-color)', color: 'white',
-                padding: '10px 24px', borderRadius: 8,
-                fontWeight: 500, transition: 'all 0.2s'
+                padding: '12px 24px', borderRadius: 12,
+                fontWeight: 500, transition: 'all 0.2s',
+                border: 'none', cursor: 'pointer'
             }}
-            className="hover:opacity-90"
         >
+            <Phone size={18} />
             ติดต่อเจ้าหน้าที่
         </button>
     );

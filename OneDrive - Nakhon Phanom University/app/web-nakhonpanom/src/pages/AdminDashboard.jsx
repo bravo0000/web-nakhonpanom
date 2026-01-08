@@ -196,11 +196,30 @@ export default function AdminDashboard() {
         }
     }, [activeTab, showPrintModal]); // Placeholder, will implement full logic below state defs.
 
-    const handlePrint = (e) => {
+    const handlePrint = async (e) => {
         if (e) {
             e.preventDefault();
             e.stopPropagation();
         }
+
+        // บันทึก printed_at ก่อนพิมพ์ (ถ้า field มีอยู่ใน database)
+        if (jobToPrint && jobToPrint.id) {
+            try {
+                await pb.collection('jobs').update(jobToPrint.id, {
+                    printed_at: new Date().toISOString()
+                });
+                // อัพเดท local state
+                setJobs(prev => prev.map(j =>
+                    j.id === jobToPrint.id
+                        ? { ...j, printedAt: new Date().toISOString() }
+                        : j
+                ));
+            } catch (err) {
+                // ถ้า field ยังไม่มีใน database ให้ข้ามไป ไม่ block การพิมพ์
+                // Field 'printed_at' ต้องเพิ่มใน PocketBase Admin Panel
+            }
+        }
+
         setTimeout(() => {
             window.print();
         }, 100);
@@ -289,43 +308,126 @@ export default function AdminDashboard() {
             step: record.step || '-',
             note: record.note || '',
             completedAt: record.completed_at || null, // Smart Data: track completion date
+            printedAt: record.printed_at || null, // Track print status
             assignees: Array.isArray(record.assignees) ? record.assignees : [],
             assigneesIds: []
         };
     };
 
-    // Fetch Jobs from PocketBase
+    // Fetch Jobs from PocketBase with Pagination (Security: Limit data load)
     useEffect(() => {
+        const MAX_RECORDS = 500; // Limit to prevent memory issues
+        let isMounted = true;
+
         const fetchJobs = async () => {
             try {
-                const records = await pb.collection('jobs').getFullList({
+                // Use getList with pagination instead of getFullList
+                const records = await pb.collection('jobs').getList(1, MAX_RECORDS, {
                     sort: '-created'
                 });
-                setJobs(records.map(mapRecordToJob));
-                setLoading(false);
+
+                if (isMounted) {
+                    setJobs(records.items.map(mapRecordToJob));
+                    setLoading(false);
+
+                    // Warn if there are more records
+                    if (records.totalItems > MAX_RECORDS && import.meta.env.DEV) {
+                        console.warn(`Warning: ${records.totalItems} total jobs, only loaded ${MAX_RECORDS}`);
+                    }
+                }
             } catch (err) {
-                console.error("Error fetching jobs:", err);
-                setLoading(false);
+                if (import.meta.env.DEV) {
+                    console.error("Error fetching jobs:", err);
+                }
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchJobs();
 
-        // Real-time Subscription
-        pb.collection('jobs').subscribe('*', async (e) => {
-            if (e.action === 'create') {
-                // But safest is to fetch the single record expanded (Wait, no expand needed for JSON assignees)
-                const newRecord = await pb.collection('jobs').getOne(e.record.id);
-                setJobs(prev => [mapRecordToJob(newRecord), ...prev]);
-            } else if (e.action === 'update') {
-                const updatedRecord = await pb.collection('jobs').getOne(e.record.id);
-                setJobs(prev => prev.map(job => job.id === e.record.id ? mapRecordToJob(updatedRecord) : job));
-            } else if (e.action === 'delete') {
-                setJobs(prev => prev.filter(job => job.id !== e.record.id));
+        // Real-time Subscription with Debounce (Security: Prevent request storm)
+        let pendingUpdates = [];
+        let debounceTimer = null;
+        const DEBOUNCE_MS = 300;
+
+        const processBatchUpdates = async (updates) => {
+            // Group by action
+            const creates = updates.filter(u => u.action === 'create');
+            const updateActions = updates.filter(u => u.action === 'update');
+            const deletes = updates.filter(u => u.action === 'delete');
+
+            // Process deletes first (just filter)
+            if (deletes.length > 0) {
+                const deleteIds = deletes.map(d => d.record.id);
+                setJobs(prev => prev.filter(job => !deleteIds.includes(job.id)));
             }
+
+            // Process creates and updates (fetch fresh data)
+            const idsToFetch = [
+                ...creates.map(c => c.record.id),
+                ...updateActions.map(u => u.record.id)
+            ];
+
+            if (idsToFetch.length > 0) {
+                try {
+                    // Limit batch size to prevent overload
+                    const limitedIds = idsToFetch.slice(0, 20);
+                    const fetchPromises = limitedIds.map(id =>
+                        pb.collection('jobs').getOne(id).catch(() => null)
+                    );
+                    const fetchedRecords = await Promise.all(fetchPromises);
+                    const validRecords = fetchedRecords.filter(r => r !== null);
+
+                    setJobs(prev => {
+                        let newJobs = [...prev];
+
+                        validRecords.forEach(record => {
+                            const mappedJob = mapRecordToJob(record);
+                            const existingIndex = newJobs.findIndex(j => j.id === record.id);
+
+                            if (existingIndex >= 0) {
+                                // Update existing
+                                newJobs[existingIndex] = mappedJob;
+                            } else {
+                                // Add new (at start)
+                                newJobs = [mappedJob, ...newJobs];
+                            }
+                        });
+
+                        return newJobs;
+                    });
+                } catch (err) {
+                    if (import.meta.env.DEV) {
+                        console.error("Error processing batch updates:", err);
+                    }
+                }
+            }
+        };
+
+        pb.collection('jobs').subscribe('*', (e) => {
+            pendingUpdates.push(e);
+
+            // Clear existing timer
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
+
+            // Set new debounce timer
+            debounceTimer = setTimeout(() => {
+                if (pendingUpdates.length > 0 && isMounted) {
+                    processBatchUpdates([...pendingUpdates]);
+                    pendingUpdates = [];
+                }
+            }, DEBOUNCE_MS);
         });
 
         return () => {
+            isMounted = false;
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
             pb.collection('jobs').unsubscribe();
         };
     }, []);
@@ -443,8 +545,12 @@ export default function AdminDashboard() {
         setFilterEndDate('');
     };
 
-    // Filter Logic
+    // Filter Logic with Input Validation
     const filteredJobs = useMemo(() => {
+        // Security: Limit search term length to prevent memory issues
+        const MAX_SEARCH_LENGTH = 100;
+        const safeSearchTerm = searchTerm.slice(0, MAX_SEARCH_LENGTH).toLowerCase();
+
         return jobs.filter(job => {
             // Permission Filter: Check if user is allowed to see this department
             if (currentUser?.role !== 'admin') {
@@ -455,8 +561,8 @@ export default function AdminDashboard() {
             }
 
             const matchesSearch =
-                job.receptionNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                job.owner.toLowerCase().includes(searchTerm.toLowerCase());
+                (job.receptionNo || '').toLowerCase().includes(safeSearchTerm) ||
+                (job.owner || '').toLowerCase().includes(safeSearchTerm);
 
             const matchesDept = filterDept === 'ทั้งหมด' || job.department === filterDept;
             const matchesStatus = filterStatus === 'ทั้งหมด' || job.status === filterStatus;
@@ -553,12 +659,25 @@ export default function AdminDashboard() {
     };
 
     const handleBulkDelete = async () => {
+        // Security: Limit bulk delete to prevent server overload
+        const MAX_BULK_DELETE = 50;
+        const BATCH_SIZE = 10;
+
+        if (selectedJobIds.length > MAX_BULK_DELETE) {
+            alert(`สามารถลบได้สูงสุด ${MAX_BULK_DELETE} รายการต่อครั้ง กรุณาเลือกใหม่`);
+            return;
+        }
+
         if (window.confirm(`คุณต้องการลบงานที่เลือกจำนวน ${selectedJobIds.length} รายการใช่หรือไม่?`)) {
             try {
-                await Promise.all(selectedJobIds.map(id => pb.collection('jobs').delete(id)));
+                // Process in batches to prevent overload
+                for (let i = 0; i < selectedJobIds.length; i += BATCH_SIZE) {
+                    const batch = selectedJobIds.slice(i, i + BATCH_SIZE);
+                    await Promise.all(batch.map(id => pb.collection('jobs').delete(id)));
+                }
                 setSelectedJobIds([]);
             } catch (err) {
-                alert('An error occurred while deleting: ' + err.message);
+                alert('เกิดข้อผิดพลาดในการลบ: ' + (err.message || 'Unknown error'));
             }
         }
     };
@@ -1109,7 +1228,14 @@ export default function AdminDashboard() {
                                                     </span>
                                                 </td>
                                                 <td style={{ verticalAlign: 'top' }}>
-                                                    <div style={{ fontWeight: 500 }}>{job.receptionNo}</div>
+                                                    <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        {job.receptionNo}
+                                                        {job.printedAt && (
+                                                            <span title={`พิมพ์เมื่อ ${new Date(job.printedAt).toLocaleString('th-TH')}`} style={{ color: '#10b981', fontSize: '0.85rem' }}>
+                                                                <Printer size={14} />
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div style={{ fontSize: '0.85rem', color: '#888' }}>{formatThaiDate(job.date)}</div>
                                                     {(() => {
                                                         // Check if job is completed AND at the last step

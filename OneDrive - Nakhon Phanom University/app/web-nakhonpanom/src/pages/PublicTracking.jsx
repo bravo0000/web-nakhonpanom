@@ -77,6 +77,15 @@ export default function PublicTracking() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Security: Sanitize text to prevent XSS (strip HTML tags)
+    const sanitizeText = (text, maxLength = 1000) => {
+        if (!text) return '';
+        // Remove HTML tags and limit length
+        return String(text)
+            .replace(/<[^>]*>/g, '')  // Strip HTML tags
+            .slice(0, maxLength);
+    };
+
     const formatThaiDate = (dateString) => {
         if (!dateString) return '-';
         const date = new Date(dateString);
@@ -93,9 +102,23 @@ export default function PublicTracking() {
         setError('');
 
         try {
-            // 1. Fetch Job from PocketBase (Case-Insensitive search via OR)
-            // Use OR logic because :lower might not be supported on this PB version
-            const filter = `reception_no="${recNo}" || reception_no="${recNo.toLowerCase()}" || reception_no="${recNo.toUpperCase()}"`;
+            // Security: Sanitize and validate input
+            const MAX_INPUT_LENGTH = 50;
+            let sanitizedRecNo = recNo.trim().slice(0, MAX_INPUT_LENGTH);
+
+            // Remove potentially dangerous characters (SQL injection prevention)
+            sanitizedRecNo = sanitizedRecNo.replace(/['"\\;=|&<>]/g, '');
+
+            if (!sanitizedRecNo) {
+                setError('กรุณากรอกเลขที่รับเรื่อง');
+                setLoading(false);
+                return;
+            }
+
+            // 1. Fetch Job from PocketBase (Case-Insensitive search)
+            // Use escaped string to prevent injection
+            const escapedRecNo = sanitizedRecNo.replace(/"/g, '\\"');
+            const filter = `reception_no~"${escapedRecNo}"`;
             const record = await pb.collection('jobs').getFirstListItem(filter);
 
             if (!record) {
@@ -290,7 +313,7 @@ export default function PublicTracking() {
                                         <div style={{ color: '#f57c00' }}><FileText size={20} /></div>
                                         <div>
                                             <div style={{ fontWeight: 600, color: '#e65100', marginBottom: 4 }}>หมายเหตุ / แจ้งเตือน:</div>
-                                            <div style={{ color: '#5d4037', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{result.note}</div>
+                                            <div style={{ color: '#5d4037', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{sanitizeText(result.note)}</div>
                                         </div>
                                     </div>
                                 </div>

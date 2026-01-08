@@ -1,7 +1,6 @@
-/* Screen styles - hide by default or show as preview */
+/* Screen styles - hide by default */
 .print-container {
     display: none;
-    /* Hidden on screen by default */
     background: white;
     color: black;
     font-family: 'Sarabun', 'Inter', sans-serif;
@@ -9,69 +8,264 @@
 
 /* Print Styles */
 @media print {
+
+    /* Force exact A4 size */
     @page {
-        size: A4;
-        margin: 0;
+        size: 210mm 297mm;
+        margin: 10mm;
     }
 
-    body * {
-        visibility: hidden;
+    /* Hide EVERYTHING by default */
+    * {
+        visibility: hidden !important;
     }
 
-    .print-container,
-    .print-container * {
-        visibility: visible;
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        width: auto !important;
+        overflow: hidden !important;
+        background: white !important;
     }
 
+    /* Explicitly hide admin dashboard elements */
+    .admin-container,
+    .sidebar,
+    .admin-content,
+    .table-card,
+    .table-wrapper,
+    .filter-bar,
+    .dashboard-header,
+    .modal-overlay,
+    .modal-content,
+    .bulk-action-bar,
+    .admin-container table,
+    .admin-content table,
+    .table-card table,
+    nav,
+    header,
+    footer,
+    aside,
+    .nav-menu,
+    .nav-item,
+    .primary-button,
+    .action-button,
+    .status-badge,
+    .filter-select,
+    .search-input {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+        position: absolute !important;
+        left: -9999px !important;
+    }
+
+    /* Show ONLY print container and its children */
     .print-container {
         display: block !important;
-        position: absolute;
-        left: 1cm;
-        top: 1cm;
-        width: auto;
-        height: auto;
-        padding: 0;
-        background: transparent;
-        z-index: 9999;
+        visibility: visible !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 190mm !important;
+        height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: white !important;
+        z-index: 999999 !important;
     }
 
-    .mini-slip {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
+    .print-container * {
+        visibility: visible !important;
     }
 
-    .qr-box {
-        margin-bottom: 4px;
-        text-align: center;
+    /* Card styles */
+    .print-container .slip-card {
+        display: block !important;
+        position: relative !important;
+        left: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        border: 1pt solid #000 !important;
+        border-radius: 3mm !important;
+        padding: 4mm 5mm !important;
+        margin-bottom: 0 !important;
+        background: white !important;
+        box-sizing: border-box !important;
     }
 
-    .qr-explain {
-        font-size: 9pt;
-        color: black;
-        margin-top: 2px;
-        font-weight: 500;
-        white-space: nowrap;
+    /* Badge - no border, no background */
+    .print-container .slip-badge {
+        display: block !important;
+        position: absolute !important;
+        top: 2mm !important;
+        right: 4mm !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        font-size: 8pt !important;
+        font-weight: 600 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        color: #000 !important;
     }
 
-    .info-box {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+    /* Header */
+    .print-container .slip-header {
+        display: block !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        text-align: center !important;
+        margin-bottom: 3mm !important;
+        padding-bottom: 2mm !important;
+        border-bottom: 0.3pt solid #000 !important;
     }
 
-    .rx-no,
-    .rx-date {
-        font-size: 10pt;
-        white-space: nowrap;
-        color: black;
-        line-height: 1.2;
+    .print-container .slip-title {
+        display: block !important;
+        font-size: 10pt !important;
+        font-weight: 700 !important;
+        color: #000 !important;
+        line-height: 1.4 !important;
     }
 
-    .barcode-box {
-        position: fixed;
-        bottom: 1cm;
-        left: 1cm;
+    .print-container .slip-subtitle {
+        display: block !important;
+        font-size: 9pt !important;
+        color: #000 !important;
+        line-height: 1.3 !important;
+    }
+
+    /* Content area */
+    .print-container .slip-content {
+        display: flex !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        gap: 5mm !important;
+        align-items: flex-start !important;
+    }
+
+    /* QR and Barcode */
+    .print-container .slip-codes {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        gap: 3mm !important;
+        min-width: 25mm !important;
+        padding-top: 2mm !important;
+    }
+
+    .print-container .slip-codes canvas {
+        display: block !important;
+        width: 80px !important;
+        height: 80px !important;
+    }
+
+    .print-container .barcode-wrapper {
+        display: block !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        transform: scale(0.7) !important;
+        transform-origin: center center !important;
+    }
+
+    .print-container .barcode-wrapper svg {
+        display: block !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+    }
+
+    /* Info section */
+    .print-container .slip-info {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        gap: 2mm !important;
+        padding-top: 2mm !important;
+    }
+
+    .print-container .info-row {
+        display: flex !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        font-size: 9pt !important;
+        line-height: 1.4 !important;
+        color: #000 !important;
+    }
+
+    .print-container .info-label {
+        display: inline !important;
+        color: #000 !important;
+        min-width: 18mm !important;
+        flex-shrink: 0 !important;
+    }
+
+    .print-container .info-value {
+        display: inline !important;
+        color: #000 !important;
+        font-weight: 500 !important;
+    }
+
+    .print-container .scan-hint {
+        display: block !important;
+        position: relative !important;
+        left: auto !important;
+        width: auto !important;
+        height: auto !important;
+        margin-top: 2mm !important;
+        font-size: 8pt !important;
+        color: #000 !important;
+        font-weight: 500 !important;
+        text-align: center !important;
+        padding-top: 2mm !important;
+    }
+
+    /* Cut line */
+    .print-container .cut-line {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        position: relative !important;
+        left: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 4mm 0 !important;
+    }
+
+    .print-container .cut-line::before,
+    .print-container .cut-line::after {
+        content: '' !important;
+        flex: 1 !important;
+        border-top: 0.5pt dashed #000 !important;
+    }
+
+    .print-container .scissors {
+        display: inline !important;
+        padding: 0 3mm !important;
+        font-size: 12pt !important;
+        color: #000 !important;
     }
 }

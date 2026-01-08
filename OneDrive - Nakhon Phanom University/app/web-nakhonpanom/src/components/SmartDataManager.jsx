@@ -43,10 +43,20 @@ export default function SmartDataManager({ jobs, onJobsDeleted }) {
         safe: completedJobs.length - expiredJobs.length - expiringSoonJobs.length
     };
 
-    // Export to CSV
+    // Export to CSV with Security Sanitization
     const handleExport = (jobsToExport) => {
         setIsExporting(true);
         try {
+            // Security: Sanitize cell content to prevent CSV Injection
+            const sanitizeCSVCell = (value) => {
+                let str = String(value || '').replace(/"/g, '""');
+                // Prevent CSV Injection: prefix formula characters with single quote
+                if (/^[=+\-@\t\r]/.test(str)) {
+                    str = "'" + str;
+                }
+                return str;
+            };
+
             const headers = ['เลขรับ', 'วันที่รับ', 'ฝ่าย', 'ประเภทงาน', 'ผู้ขอ', 'สถานะ', 'ขั้นตอน', 'ผู้รับผิดชอบ', 'หมายเหตุ', 'วันที่เสร็จ'];
             const rows = jobsToExport.map(job => [
                 job.receptionNo,
@@ -63,7 +73,7 @@ export default function SmartDataManager({ jobs, onJobsDeleted }) {
 
             const csvContent = [
                 headers.join(','),
-                ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                ...rows.map(row => row.map(cell => `"${sanitizeCSVCell(cell)}"`).join(','))
             ].join('\n');
 
             // Add BOM for Excel UTF-8 compatibility
@@ -76,7 +86,9 @@ export default function SmartDataManager({ jobs, onJobsDeleted }) {
             link.click();
             URL.revokeObjectURL(url);
         } catch (err) {
-            console.error('Export error:', err);
+            if (import.meta.env.DEV) {
+                console.error('Export error:', err);
+            }
             alert('เกิดข้อผิดพลาดในการ Export: ' + err.message);
         } finally {
             setIsExporting(false);

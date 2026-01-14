@@ -12,18 +12,42 @@
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(255, 255, 255, 0.5);
 
+  /* Status Colors */
+  --status-active: #FF9800;
+  --status-active-bg: #fff3e0;
+  --status-pending: #F44336;
+  --status-pending-bg: #ffebee;
+  --status-completed: #4CAF50;
+  --status-completed-bg: #e8f5e9;
+  --status-info: #2196F3;
+  --status-info-bg: #e3f2fd;
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 
   /* Radius */
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
 
   /* Transitions */
-  --transition-fast: 0.2s ease;
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
   --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
@@ -99,4 +123,130 @@ a {
 
 .font-medium {
   font-weight: 500;
+}
+
+/* Status Badge Utilities */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-active {
+  background: var(--status-active-bg);
+  color: var(--status-active);
+}
+
+.badge-pending {
+  background: var(--status-pending-bg);
+  color: var(--status-pending);
+}
+
+.badge-completed {
+  background: var(--status-completed-bg);
+  color: var(--status-completed);
+}
+
+.badge-info {
+  background: var(--status-info-bg);
+  color: var(--status-info);
+}
+
+/* Card Utilities */
+.card {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Animation Utilities */
+.animate-fade-in {
+  animation: fadeIn var(--transition-smooth) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp var(--transition-smooth) forwards;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Flex Utilities */
+.flex {
+  display: flex;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: var(--space-2);
+}
+
+.gap-4 {
+  gap: var(--space-4);
+}
+
+/* Text Utilities */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Focus Visible for Accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }

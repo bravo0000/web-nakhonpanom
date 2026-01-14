@@ -1,40 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle } from 'lucide-react';
 import './AddJobModal.css'; // Reuse styles
-
-// Mock Workflows (Should match WorkflowEditor/PublicTracking)
-// In a real app, this would be passed as a prop or context
-const MOCK_WORKFLOWS = {
-    'ฝ่ายทะเบียน': [
-        { id: 1, name: 'รับเรื่อง / ตรวจสอบเอกสาร' },
-        { id: 2, name: 'ตรวจสอบหลักทรัพย์' },
-        { id: 3, name: 'เสนอเจ้าพนักงานที่ดิน' },
-        { id: 4, name: 'ชำระค่าธรรมเนียม / จดทะเบียน' },
-        { id: 5, name: 'แจกหนังสือสำคัญ' }
-    ],
-    'ฝ่ายรังวัด': [
-        { id: 1, name: 'รับเรื่อง / นัดรังวัด' },
-        { id: 2, name: 'วางเงินมัดจำรังวัด' },
-        { id: 3, name: 'ช่างออกไปทำการรังวัด' },
-        { id: 4, name: 'คำนวณ / เขียนแผนที่' },
-        { id: 5, name: 'ตรวจรูปแผนที่ / สารบบ' },
-        { id: 6, name: 'ส่งฝ่ายทะเบียนดำเนินการต่อ' }
-    ],
-    'กลุ่มงานวิชาการที่ดิน': [
-        { id: 1, name: 'รับเรื่องร้องเรียน / หารือ' },
-        { id: 2, name: 'ตรวจสอบข้อเท็จจริง / ข้อกฎหมาย' },
-        { id: 3, name: 'สรุปเรื่องเสนอความเห็น' },
-        { id: 4, name: 'เจ้าพนักงานที่ดินพิจารณา' },
-        { id: 5, name: 'แจ้งผลการพิจารณา' }
-    ],
-    'ฝ่ายอำนวยการ': [
-        { id: 1, name: 'รับหนังสือเข้า' },
-        { id: 2, name: 'เสนอหัวหน้าฝ่ายอำนวยการ' },
-        { id: 3, name: 'เจ้าหน้าที่ดำเนินการ / พิมพ์หนังสือ' },
-        { id: 4, name: 'เสนอลงนาม' },
-        { id: 5, name: 'ออกเลขหนังสือส่ง / ส่งไปรษณีย์' }
-    ]
-};
+import { INITIAL_WORKFLOWS } from '../config/constants';
 
 export default function UpdateStatusModal({ isOpen, onClose, job, onUpdate, workflows }) {
     if (!isOpen || !job) return null;
@@ -47,8 +14,8 @@ export default function UpdateStatusModal({ isOpen, onClose, job, onUpdate, work
     const isSameDept = targetJobs.every(j => j.department === firstDept);
 
     // If same dept, use that dept's workflow. If mixed, no workflow steps available.
-    // Use passed workflows prop if available (from DB), otherwise mock
-    const sourceWorkflows = workflows || MOCK_WORKFLOWS;
+    // Use passed workflows prop if available (from DB), otherwise fallback to initial
+    const sourceWorkflows = workflows || INITIAL_WORKFLOWS;
     const currentWorkflow = isSameDept ? (sourceWorkflows[firstDept] || []) : [];
 
     // State for step selection (step name OR 'COMPLETED')

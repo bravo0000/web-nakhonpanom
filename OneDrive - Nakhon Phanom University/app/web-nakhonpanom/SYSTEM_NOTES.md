@@ -262,6 +262,17 @@ journalctl -u cloudflared -f
 
 ---
 
+## 📝 สิ่งที่ทำไปแล้ว (13 ม.ค. 2569) - Troubleshooting 502 & Connectivity
+### 🛠️ Server & Network Fixes:
+1. ✅ **Service Auto-Restart:** ตั้งค่า `systemd` ให้ Cloudflared/PocketBase รีสตาร์ทเองเมื่อล่ม (`Restart=always`)
+2. ✅ **Nginx Tuning:** ปรับ Timeouts เป็น 300s และขยาย Buffer เพื่อกันหลุด (แก้ 502)
+3. ✅ **Protocol:** บังคับใช้ `http2` (TCP) แทน QUIC (UDP) ที่ไม่เสถียร
+4. ✅ **Boot Delay:** เพิ่ม Delay 15 วินาทีก่อนเริ่ม Cloudflare ป้องกัน "ตื่นก่อนเน็ต"
+5. ✅ **Kernel Tuning:** จูน Network Stack (Sysctl) เพิ่มขนาด Buffer และ Keepalive
+6. ⏳ **Next Step:** รอทดสอบเรื่อง **MTU (Packet Fragmentation)** ถ้ายังมีปัญหาเข้าเว็บไม่ได้แต่ Ping ได้
+
+---
+
 ## 📝 สิ่งที่ทำไปแล้ว (8 ม.ค. 2569) - ระบบพิมพ์ QR และ Server Fixes
 
 ### 🖨️ Print System Improvements:
@@ -277,3 +288,42 @@ journalctl -u cloudflared -f
    - แก้ไขไฟล์ `/etc/systemd/system/cloudflared.service`: เพิ่ม `--protocol quic`
 3. ✅ **Nginx Fixes:** สร้างโฟลเดอร์ `/var/www/html` ที่หายไป และยืนยัน Config ถูกต้อง
 4. ✅ **Tested:** เข้าใช้งานได้ปกติทั้งผ่าน LAN (`192.168.44.251`) และ Domain (`dol.nakhonphanom.org`) ผ่าน 5G
+
+---
+
+## 📅 14 มกราคม 2569 - Refactor AdminDashboard & Code Quality
+
+### 🏗️ Refactoring (ลดขนาด AdminDashboard ~50%):
+
+**ไฟล์ใหม่ที่สร้าง:**
+| ไฟล์ | คำอธิบาย |
+|------|----------|
+| `src/config/constants.js` | รวม hardcoded data (PROVINCES, INITIAL_JOB_TYPES, etc.) |
+| `src/utils/helpers.js` | Helper functions (formatThaiDate, getStatusText, etc.) |
+| `src/utils/useAppSettings.js` | Custom hooks สำหรับดึง settings จาก DB |
+| `src/utils/security.js` | Security utilities (sanitize, validate, rate limiter) |
+| `src/components/AdminSidebar.jsx` | Navigation sidebar component |
+| `src/components/DashboardStats.jsx` | Statistics cards component |
+| `src/components/DashboardCharts.jsx` | Charts (Pie, Bar) component |
+| `src/components/JobFilters.jsx` | Search & filter controls |
+| `src/components/JobTable.jsx` | Job listing table with bulk actions |
+| `src/components/ScanTab.jsx` | Barcode/QR scan interface |
+
+### 🎨 Styling Improvements:
+- เพิ่ม CSS variables ใน `index.css`: status colors, spacing, shadows, radius
+- เพิ่ม utility classes: badges, cards, animations, flex utilities
+- เพิ่ม `:focus-visible` สำหรับ accessibility
+
+### 🔒 Security:
+- สร้าง `security.js` รวม sanitize functions ป้องกัน XSS, SQL Injection
+- เพิ่ม `RateLimiter` class ป้องกัน brute force
+
+### 🐛 Bug Fixes:
+1. ✅ แก้ไข Chart warnings (minWidth)
+2. ✅ แก้ไข 404 error เมื่อ update job ที่ถูกลบ (auto-refresh)
+3. ✅ แก้ไข Public Tracking ไม่แสดงงานที่เสร็จสิ้น (timeline logic)
+4. ✅ เพิ่มกล่อง "ดำเนินการเสร็จสิ้น" สวยงามใน Public Tracking
+
+### ⚠️ หมายเหตุ .env:
+- **Development:** `VITE_POCKETBASE_URL=http://192.168.44.251:8090`
+- **Production:** `VITE_POCKETBASE_URL=/`

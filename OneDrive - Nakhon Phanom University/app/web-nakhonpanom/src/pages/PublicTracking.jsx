@@ -4,72 +4,10 @@ import { createPortal } from 'react-dom';
 import Layout from '../components/Layout';
 import { Search, FileText, Check, Clock, MapPin, Phone } from 'lucide-react';
 import { fetchAppSetting } from '../utils/auth';
+import { useWorkflows } from '../utils/useAppSettings';
+import { INITIAL_WORKFLOWS } from '../config/constants';
 import pb from '../lib/pocketbase';
 import './PublicTracking.css';
-
-// Mock Workflows (Should match WorkflowEditor)
-const MOCK_WORKFLOWS = {
-    'ฝ่ายทะเบียน': [
-        { id: 1, name: 'รับเรื่อง / ตรวจสอบเอกสาร' },
-        { id: 2, name: 'ตรวจสอบหลักทรัพย์' },
-        { id: 3, name: 'เสนอเจ้าพนักงานที่ดิน' },
-        { id: 4, name: 'ชำระค่าธรรมเนียม / จดทะเบียน' },
-        { id: 5, name: 'แจกหนังสือสำคัญ' }
-    ],
-    'ฝ่ายรังวัด': [
-        { id: 1, name: 'รับเรื่อง / นัดรังวัด' },
-        { id: 2, name: 'วางเงินมัดจำรังวัด' },
-        { id: 3, name: 'ช่างออกไปทำการรังวัด' },
-        { id: 4, name: 'คำนวณ / เขียนแผนที่' },
-        { id: 5, name: 'ตรวจรูปแผนที่ / สารบบ' },
-        { id: 6, name: 'ส่งฝ่ายทะเบียนดำเนินการต่อ' }
-    ],
-    'กลุ่มงานวิชาการที่ดิน': [
-        { id: 1, name: 'รับเรื่องร้องเรียน / หารือ' },
-        { id: 2, name: 'ตรวจสอบข้อเท็จจริง / ข้อกฎหมาย' },
-        { id: 3, name: 'สรุปเรื่องเสนอความเห็น' },
-        { id: 4, name: 'เจ้าพนักงานที่ดินพิจารณา' },
-        { id: 5, name: 'แจ้งผลการพิจารณา' }
-    ],
-    'ฝ่ายอำนวยการ': [
-        { id: 1, name: 'รับหนังสือเข้า' },
-        { id: 2, name: 'เสนอหัวหน้าฝ่ายอำนวยการ' },
-        { id: 3, name: 'เจ้าหน้าที่ดำเนินการ / พิมพ์หนังสือ' },
-        { id: 4, name: 'เสนอลงนาม' },
-        { id: 5, name: 'ออกเลขหนังสือส่ง / ส่งไปรษณีย์' }
-    ]
-};
-
-// Mock Data
-const MOCK_JOBS_DB = [
-    {
-        receptionNo: '123/2567',
-        date: '2024-01-01',
-        type: 'รังวัดสอบเขต',
-        department: 'ฝ่ายรังวัด',
-        owner: 'นายสมชาย ใจดี',
-        currentStepIndex: 3,
-        assignees: ['นายช่าง แม่นยำ']
-    },
-    {
-        receptionNo: '555/2567',
-        date: '2024-01-02',
-        type: 'จดทะเบียนขายฝาก',
-        department: 'ฝ่ายทะเบียน',
-        owner: 'นางสาวมีนา รักดี',
-        currentStepIndex: 1,
-        assignees: ['นายทะเบียน ใจดี']
-    },
-    {
-        receptionNo: '999/2567',
-        date: '2024-01-03',
-        type: 'หารือระเบียบ',
-        department: 'กลุ่มงานวิชาการที่ดิน',
-        owner: 'นายใจ กล้าหาญ',
-        currentStepIndex: 4,
-        assignees: []
-    },
-];
 
 export default function PublicTracking() {
     const [receptionNo, setReceptionNo] = useState('');
@@ -141,18 +79,24 @@ export default function PublicTracking() {
                 assignees: Array.isArray(record.assignees) ? record.assignees : [] // JSON array of strings
             };
 
-            // 3. Load Active Workflows from settings (fallback to Mock)
-            const workflowsDB = await fetchAppSetting('workflows', MOCK_WORKFLOWS);
+            // 3. Load Active Workflows from settings (fallback to constants)
+            const workflowsDB = await fetchAppSetting('workflows', INITIAL_WORKFLOWS);
 
             // 4. Generate timeline based on department workflow
             const workflow = workflowsDB[foundJob.department] || workflowsDB['ฝ่ายทะเบียน'];
             const timeline = workflow.map((step, index) => {
                 let status = 'pending';
-                // Allow job.step (string name) to override index logic if present
-                if (foundJob.step) {
+
+                // ถ้างานเสร็จสิ้นแล้ว ให้ทุก step เป็น completed
+                if (foundJob.status === 'completed') {
+                    status = 'completed';
+                } else if (foundJob.step) {
+                    // หา step ปัจจุบัน
                     const stepIndex = workflow.findIndex(s => s.name === foundJob.step);
-                    if (index < stepIndex) status = 'completed';
-                    else if (index === stepIndex) status = foundJob.status === 'completed' ? 'completed' : 'active';
+                    if (stepIndex >= 0) {
+                        if (index < stepIndex) status = 'completed';
+                        else if (index === stepIndex) status = 'active';
+                    }
                 }
 
                 return {
@@ -304,6 +248,38 @@ export default function PublicTracking() {
                                         </div>
                                     );
                                 })}
+
+                                {/* แสดง badge เสร็จสิ้น ถ้างานเสร็จแล้ว */}
+                                {result.status === 'completed' && (
+                                    <div
+                                        className="timeline-step animate-slide-in"
+                                        style={{ '--delay': `${result.timeline.length * 0.15}s` }}
+                                    >
+                                        <div className="step-icon completed" style={{
+                                            backgroundColor: '#10b981',
+                                            borderColor: '#10b981',
+                                            boxShadow: '0 0 0 4px rgba(16, 185, 129, 0.2)'
+                                        }}>
+                                            <Check className="w-5 h-5" style={{ color: 'white' }} />
+                                        </div>
+                                        <div className="step-content hover-lift" style={{
+                                            borderLeft: '4px solid #10b981',
+                                            background: '#ffffff'
+                                        }}>
+                                            <div className="step-title" style={{
+                                                color: '#059669',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}>
+                                                <span>🎉</span> ดำเนินการเสร็จสิ้น
+                                            </div>
+                                            <div className="step-date">
+                                                งานนี้ได้รับการดำเนินการเรียบร้อยแล้ว
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Note Section */}

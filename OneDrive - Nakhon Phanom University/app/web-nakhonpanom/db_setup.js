@@ -132,6 +132,21 @@ async function main() {
                     }
                 ]
             });
+
+            // 4. Create 'quick_links' collection
+            await createCollection({
+                name: 'quick_links',
+                type: 'base',
+                schema: [
+                    { name: 'name', type: 'text', required: true },
+                    { name: 'url', type: 'url', required: true },
+                    { name: 'icon', type: 'text' },
+                    { name: 'order', type: 'number' },
+                    { name: 'active', type: 'bool' }
+                ],
+                listRule: '', // Public read
+                viewRule: ''  // Public read
+            });
         }
 
     } catch (err) {

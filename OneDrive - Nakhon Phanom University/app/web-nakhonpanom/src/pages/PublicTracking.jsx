@@ -8,6 +8,7 @@ import { useWorkflows } from '../utils/useAppSettings';
 import { INITIAL_WORKFLOWS } from '../config/constants';
 import pb from '../lib/pocketbase';
 import './PublicTracking.css';
+import QuickLinks from '../components/QuickLinks';
 
 export default function PublicTracking() {
     const [receptionNo, setReceptionNo] = useState('');
@@ -126,6 +127,9 @@ export default function PublicTracking() {
     // 0. Use useSearchParams hook
     const [searchParams] = useSearchParams();
 
+    // Widget mode check (e.g. ?min=1)
+    const isWidget = searchParams.get('min') === '1';
+
     // Auto-search from URL params
     useEffect(() => {
         const receptionNoParam = searchParams.get('receptionNo');
@@ -148,7 +152,7 @@ export default function PublicTracking() {
         <Layout>
             <div className="public-page-container">
                 {/* Dynamic Background via Portal to escape container constraints */}
-                {createPortal(
+                {!isWidget && createPortal(
                     <div className="page-background">
                         <div className="gradient-blob blob-1" style={{ top: '10%', right: '-10%' }}></div>
                         <div className="gradient-blob blob-2" style={{ bottom: '10%', left: '-10%' }}></div>
@@ -158,16 +162,20 @@ export default function PublicTracking() {
                 )}
 
                 <div className="tracking-wrapper">
-                    <h1 className="tracking-title animate-fade-in-up">
-                        <span style={{ fontSize: '0.85em', fontWeight: 500, display: 'block', marginBottom: 8 }}>ติดตามสถานะคำขอ</span>
-                        <span className="text-gradient">สำนักงานที่ดินจังหวัดนครพนม</span>
-                    </h1>
-                    <p className="tracking-subtitle animate-fade-in-up delay-100">
-                        กรอกเลขที่รับเรื่องและวันที่เพื่อดูความคืบหน้าแบบ Real-time
-                    </p>
+                    {!isWidget && (
+                        <>
+                            <h1 className="tracking-title animate-fade-in-up">
+                                <span style={{ fontSize: '0.85em', fontWeight: 500, display: 'block', marginBottom: 8 }}>ติดตามสถานะคำขอ</span>
+                                <span className="text-gradient">สำนักงานที่ดินจังหวัดนครพนม</span>
+                            </h1>
+                            <p className="tracking-subtitle animate-fade-in-up delay-100">
+                                กรอกเลขที่รับเรื่องและวันที่เพื่อดูความคืบหน้าแบบ Real-time
+                            </p>
+                        </>
+                    )}
 
                     {/* Search Card */}
-                    <div className="glass search-card">
+                    <div className="glass search-card" style={isWidget ? { marginTop: 0 } : {}}>
                         <form onSubmit={handleSearch}>
                             <div className="form-group">
                                 <label className="form-label">เลขที่รับเรื่อง</label>
@@ -203,6 +211,13 @@ export default function PublicTracking() {
                             </button>
                         </form>
                     </div>
+
+                    {/* Quick Services Links - Show only when not searching or result is empty */}
+                    {!result && !isWidget && (
+                        <div className="animate-fade-in-up delay-200">
+                            <QuickLinks />
+                        </div>
+                    )}
 
                     {/* Results Timeline */}
                     {result && (

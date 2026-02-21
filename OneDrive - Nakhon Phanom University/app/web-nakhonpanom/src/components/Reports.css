@@ -231,8 +231,7 @@
     .dashboard-header,
     .no-print,
     .logout-section,
-    .screen-only,
-    .stat-grid {
+    .screen-only {
         display: none !important;
     }
 

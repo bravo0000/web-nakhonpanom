@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Printer, FileText, Clock, AlertTriangle, CheckCircle, Users, Filter, Calendar } from 'lucide-react';
 import './Reports.css';
 
@@ -15,6 +15,13 @@ export default function Reports({ jobs, deptSettings, currentUser }) {
     const [selectedDept, setSelectedDept] = useState(allowedDepts[0] || '');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+
+    // Ensure selectedDept is set when allowedDepts becomes available
+    useEffect(() => {
+        if (!selectedDept && allowedDepts.length > 0) {
+            setSelectedDept(allowedDepts[0]);
+        }
+    }, [allowedDepts, selectedDept]);
 
     // 2. Logic to calculate stats based on selected department
     const reportData = useMemo(() => {

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Check, FileText } from 'lucide-react';
+import { Plus, Check, FileText, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Config & Utils
@@ -65,6 +65,7 @@ export default function AdminDashboard() {
     const [workflows, setWorkflows] = useState(INITIAL_WORKFLOWS);
     const [deptSettings, setDeptSettings] = useState(INITIAL_DEPT_SETTINGS);
     const [departments, setDepartments] = useState(['ฝ่ายทะเบียน', 'ฝ่ายรังวัด', 'กลุ่มงานวิชาการที่ดิน', 'ฝ่ายอำนวยการ']);
+    const [visitorCount, setVisitorCount] = useState(0);
 
     // Modals state
     const [isJobModalOpen, setIsJobModalOpen] = useState(false);
@@ -90,6 +91,14 @@ export default function AdminDashboard() {
             const defaultDepts = ['ฝ่ายทะเบียน', 'ฝ่ายรังวัด', 'กลุ่มงานวิชาการที่ดิน', 'ฝ่ายอำนวยการ'];
             const fetchedDepts = await fetchAppSetting('departments', defaultDepts);
             setDepartments(fetchedDepts);
+
+            // Fetch Visitor Count
+            try {
+                const visits = await pb.collection('page_visits').getList(1, 1);
+                setVisitorCount(visits.totalItems);
+            } catch (err) {
+                console.log('Error fetching visitors:', err.message);
+            }
         };
         loadSettings();
     }, []);
@@ -372,8 +381,17 @@ export default function AdminDashboard() {
         }
 
         setJobToPrint(targetJob);
+
+        // Add printing-slip class before printing
+        document.body.classList.add('printing-slip');
+
         setTimeout(() => {
             window.print();
+
+            // Remove the class after the print dialog closes
+            setTimeout(() => {
+                document.body.classList.remove('printing-slip');
+            }, 500);
         }, 100);
     };
 
@@ -618,6 +636,19 @@ export default function AdminDashboard() {
                                 ))}
                             </select>
                         </header>
+
+                        {/* Top-level system stats row (new) */}
+                        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                            <div className="stat-card" style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px' }}>
+                                <div>
+                                    <div className="stat-label">ยอดผู้เข้าใช้งานระบบค้นหาสถานะ</div>
+                                    <div className="stat-value" style={{ color: '#0ea5e9', fontSize: '2rem' }}>{visitorCount.toLocaleString()}</div>
+                                </div>
+                                <div className="stat-icon-bg" style={{ background: '#e0f2fe', color: '#0ea5e9', margin: 0 }}>
+                                    <Users size={24} />
+                                </div>
+                            </div>
+                        </div>
 
                         <DashboardStats statsData={statsData} />
                         <DashboardCharts

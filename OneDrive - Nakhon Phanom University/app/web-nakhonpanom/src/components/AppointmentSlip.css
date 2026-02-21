@@ -15,13 +15,12 @@
         margin: 10mm;
     }
 
-    /* Hide EVERYTHING by default */
-    * {
+    /* Hide EVERYTHING by default ONLY when printing slip */
+    body.printing-slip * {
         visibility: hidden !important;
     }
 
-    html,
-    body {
+    body.printing-slip {
         margin: 0 !important;
         padding: 0 !important;
         height: auto !important;
@@ -30,31 +29,30 @@
         background: white !important;
     }
 
-    /* Explicitly hide admin dashboard elements */
-    .admin-container,
-    .sidebar,
-    .admin-content,
-    .table-card,
-    .table-wrapper,
-    .filter-bar,
-    .dashboard-header,
-    .modal-overlay,
-    .modal-content,
-    .bulk-action-bar,
-    .admin-container table,
-    .admin-content table,
-    .table-card table,
-    nav,
-    header,
-    footer,
-    aside,
-    .nav-menu,
-    .nav-item,
-    .primary-button,
-    .action-button,
-    .status-badge,
-    .filter-select,
-    .search-input {
+    /* Explicitly hide admin dashboard elements when printing slip */
+    body.printing-slip .sidebar,
+    body.printing-slip .admin-content,
+    body.printing-slip .table-card,
+    body.printing-slip .table-wrapper,
+    body.printing-slip .filter-bar,
+    body.printing-slip .dashboard-header,
+    body.printing-slip .modal-overlay,
+    body.printing-slip .modal-content,
+    body.printing-slip .bulk-action-bar,
+    body.printing-slip .admin-container table,
+    body.printing-slip .admin-content table,
+    body.printing-slip .table-card table,
+    body.printing-slip nav,
+    body.printing-slip header,
+    body.printing-slip footer,
+    body.printing-slip aside,
+    body.printing-slip .nav-menu,
+    body.printing-slip .nav-item,
+    body.printing-slip .primary-button,
+    body.printing-slip .action-button,
+    body.printing-slip .status-badge,
+    body.printing-slip .filter-select,
+    body.printing-slip .search-input {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
@@ -64,8 +62,8 @@
         left: -9999px !important;
     }
 
-    /* Show ONLY print container and its children */
-    .print-container {
+    /* Show ONLY print container and its children when printing slip */
+    body.printing-slip .print-container {
         display: block !important;
         visibility: visible !important;
         position: absolute !important;
@@ -79,12 +77,12 @@
         z-index: 999999 !important;
     }
 
-    .print-container * {
+    body.printing-slip .print-container * {
         visibility: visible !important;
     }
 
     /* Card styles */
-    .print-container .slip-card {
+    body.printing-slip .print-container .slip-card {
         display: block !important;
         position: relative !important;
         left: auto !important;
@@ -99,7 +97,7 @@
     }
 
     /* Badge - no border, no background */
-    .print-container .slip-badge {
+    body.printing-slip .print-container .slip-badge {
         display: block !important;
         position: absolute !important;
         top: 2mm !important;
@@ -116,7 +114,7 @@
     }
 
     /* Header */
-    .print-container .slip-header {
+    body.printing-slip .print-container .slip-header {
         display: block !important;
         position: relative !important;
         left: auto !important;
@@ -128,7 +126,7 @@
         border-bottom: 0.3pt solid #000 !important;
     }
 
-    .print-container .slip-title {
+    body.printing-slip .print-container .slip-title {
         display: block !important;
         font-size: 10pt !important;
         font-weight: 700 !important;
@@ -136,7 +134,7 @@
         line-height: 1.4 !important;
     }
 
-    .print-container .slip-subtitle {
+    body.printing-slip .print-container .slip-subtitle {
         display: block !important;
         font-size: 9pt !important;
         color: #000 !important;
@@ -144,7 +142,7 @@
     }
 
     /* Content area */
-    .print-container .slip-content {
+    body.printing-slip .print-container .slip-content {
         display: flex !important;
         position: relative !important;
         left: auto !important;
@@ -155,7 +153,7 @@
     }
 
     /* QR and Barcode */
-    .print-container .slip-codes {
+    body.printing-slip .print-container .slip-codes {
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
@@ -168,13 +166,13 @@
         padding-top: 2mm !important;
     }
 
-    .print-container .slip-codes canvas {
+    body.printing-slip .print-container .slip-codes canvas {
         display: block !important;
         width: 80px !important;
         height: 80px !important;
     }
 
-    .print-container .barcode-wrapper {
+    body.printing-slip .print-container .barcode-wrapper {
         display: block !important;
         position: relative !important;
         left: auto !important;
@@ -184,7 +182,7 @@
         transform-origin: center center !important;
     }
 
-    .print-container .barcode-wrapper svg {
+    body.printing-slip .print-container .barcode-wrapper svg {
         display: block !important;
         position: relative !important;
         left: auto !important;
@@ -193,7 +191,7 @@
     }
 
     /* Info section */
-    .print-container .slip-info {
+    body.printing-slip .print-container .slip-info {
         flex: 1 !important;
         display: flex !important;
         flex-direction: column !important;
@@ -205,7 +203,7 @@
         padding-top: 2mm !important;
     }
 
-    .print-container .info-row {
+    body.printing-slip .print-container .info-row {
         display: flex !important;
         position: relative !important;
         left: auto !important;
@@ -216,20 +214,20 @@
         color: #000 !important;
     }
 
-    .print-container .info-label {
+    body.printing-slip .print-container .info-label {
         display: inline !important;
         color: #000 !important;
         min-width: 18mm !important;
         flex-shrink: 0 !important;
     }
 
-    .print-container .info-value {
+    body.printing-slip .print-container .info-value {
         display: inline !important;
         color: #000 !important;
         font-weight: 500 !important;
     }
 
-    .print-container .scan-hint {
+    body.printing-slip .print-container .scan-hint {
         display: block !important;
         position: relative !important;
         left: auto !important;
@@ -244,7 +242,7 @@
     }
 
     /* Cut line */
-    .print-container .cut-line {
+    body.printing-slip .print-container .cut-line {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -255,14 +253,14 @@
         margin: 4mm 0 !important;
     }
 
-    .print-container .cut-line::before,
-    .print-container .cut-line::after {
+    body.printing-slip .print-container .cut-line::before,
+    body.printing-slip .print-container .cut-line::after {
         content: '' !important;
         flex: 1 !important;
         border-top: 0.5pt dashed #000 !important;
     }
 
-    .print-container .scissors {
+    body.printing-slip .print-container .scissors {
         display: inline !important;
         padding: 0 3mm !important;
         font-size: 12pt !important;

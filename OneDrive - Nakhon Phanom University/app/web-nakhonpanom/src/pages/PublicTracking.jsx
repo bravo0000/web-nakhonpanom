@@ -141,6 +141,27 @@ export default function PublicTracking() {
         }
     }, [searchParams]);
 
+    // Visitor Counter Tracking
+    useEffect(() => {
+        const trackVisit = async () => {
+            try {
+                // Check if already counted in this session to prevent spam on reload
+                if (!sessionStorage.getItem('visited_public_page')) {
+                    await pb.collection('page_visits').create({
+                        path: window.location.pathname,
+                        userAgent: navigator.userAgent
+                    });
+                    sessionStorage.setItem('visited_public_page', 'true');
+                }
+            } catch (err) {
+                // Silently ignore tracking errors so they don't impact UX
+                console.log('Visitor tracking error:', err.message);
+            }
+        };
+
+        trackVisit();
+    }, []);
+
     const handleSearch = (e) => {
         e.preventDefault();
         handleAutoSearch(receptionNo);

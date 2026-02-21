@@ -147,6 +147,19 @@ async function main() {
                 listRule: '', // Public read
                 viewRule: ''  // Public read
             });
+
+            // 5. Create 'page_visits' collection for Visitor Counter
+            await createCollection({
+                name: 'page_visits',
+                type: 'base',
+                schema: [
+                    { name: 'path', type: 'text' },
+                    { name: 'userAgent', type: 'text' }
+                ],
+                listRule: '', // Allow count queries
+                viewRule: '',
+                createRule: '' // Anyone can insert a visit
+            });
         }
 
     } catch (err) {

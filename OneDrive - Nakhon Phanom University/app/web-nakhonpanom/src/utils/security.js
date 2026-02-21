@@ -1,4 +1,4 @@
-/**
+ /**
  * Security Utilities
  * ฟังก์ชันสำหรับ validate และ sanitize input เพื่อป้องกัน XSS, SQL Injection
  */
